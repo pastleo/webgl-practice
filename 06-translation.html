@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title></title>
+  <style>
+    body {
+      margin: 0;
+      background-color: black;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    .form-control {
+      margin: 0.5rem;
+    }
+    .form-control input[type=text] {
+      color: white;
+      background: none;
+      border: none;
+      border-bottom: solid 1px;
+      padding: 0.25rem;
+    }
+    .form-control label {
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="glCanvas" width="400" height="300"></canvas>
+  <div>
+    <div class='form-control'>
+      <select id='input-mode' name='mode'>
+        <option value='crop'>Original Shader - Crop</option>
+        <option value='ori-transform'>Original Shader - Transform</option>
+        <option value='transform'>Transform shader</option>
+      </select>
+    </div>
+    <div class='form-control'>
+      <label for='input-width'>Width:</label>
+      <input type='text' id='input-width' name='width' value='100'>
+    </div>
+    <div class='form-control'>
+      <label for='input-height'>Height:</label>
+      <input type='text' id='input-height' name='height' value='100'>
+    </div>
+    <div class='form-control'>
+      <label for='input-degree'>Degree:</label>
+      <input type='text' id='input-degree' name='degree' value='0'>
+    </div>
+    <div class='form-control'>
+      <label for='input-scale-x'>X Scale:</label>
+      <input type='text' id='input-scale-x' name='scaleX' value='1' data-wheel-div='150'>
+    </div>
+    <div class='form-control'>
+      <label for='input-scale-y'>Y Scale:</label>
+      <input type='text' id='input-scale-y' name='scaleY' value='1' data-wheel-div='150'>
+    </div>
+  </div>
+
+  <script src="vendor/webgl-utils.js"></script>
+  <script type='module' src='06-translation.js'></script>
+</body>
+</html>
