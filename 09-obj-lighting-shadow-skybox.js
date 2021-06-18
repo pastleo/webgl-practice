@@ -4,12 +4,12 @@ import * as WebGLObjLoader from './vendor/webgl-obj-loader.esm.js';
 import { loadImage, pipe, radToDeg, degToRad } from './lib/utils.js';
 import { matrix4 } from './lib/matrix.js';
 
-const lightPosition = [6, 20, 24];
+const lightPosition = [-15, 30, 40];
 const sceneData = {
   camera: {
     fieldOfView: degToRad(45),
     lookAtTarget: [0, 0, 0],
-    translation: [0, 20, 60],
+    translation: [-115, 30, 200],
   },
   light: {
     fieldOfView: degToRad(150),
@@ -80,7 +80,7 @@ const sceneData = {
               translation: [5, 12, 18],
             },
           ],
-          rotation: [0, degToRad(240), 0],
+          rotation: [0, degToRad(210), 0],
         },
         {
           id: 'sea',
