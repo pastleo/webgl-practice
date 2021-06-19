@@ -1,11 +1,11 @@
-const vertexShaderSource = `#version 300 es
+const vertexShaderSource = `
 
 // an attribute is an input (in) to a vertex shader.
 // It will receive data from a buffer
-in vec4 a_position;
-in vec4 a_color;
+attribute vec4 a_position;
+attribute vec4 a_color;
 uniform vec2 u_resolution;
-out vec4 v_color;
+varying vec4 v_color;
 
 // all shaders have a main function
 void main() {
@@ -21,21 +21,17 @@ void main() {
 }
 `;
 
-const fragmentShaderSource = `#version 300 es
+const fragmentShaderSource = `
 
 // fragment shaders don't have a default precision so we need
 // to pick one. highp is a good default. It means "high precision"
 precision highp float;
 
-in vec4 v_color;
-//uniform vec4 u_color;
-
-// we need to declare an output for the fragment shader
-out vec4 outColor;
+varying vec4 v_color;
 
 void main() {
   // Just set the output to a constant reddish-purple
-  outColor = v_color;
+  gl_FragColor = v_color;
 }
 `;
 
@@ -45,12 +41,23 @@ document.addEventListener('DOMContentLoaded', () => {
   const canvas = document.getElementById('glCanvas');
   window.canvas = canvas;
 
-  const gl = canvas.getContext('webgl2');
+  const gl = canvas.getContext('webgl');
   if (!gl) {
-    alert('Your browser does not support webgl2')
+    alert('Your browser does not support webgl')
     return;
   }
   window.gl = gl;
+
+  const oesVaoExt = gl.getExtension('OES_vertex_array_object');
+  if (oesVaoExt) {
+    gl.createVertexArray = (...args) => oesVaoExt.createVertexArrayOES(...args);
+    gl.deleteVertexArray = (...args) => oesVaoExt.deleteVertexArrayOES(...args);
+    gl.isVertexArray = (...args) => oesVaoExt.isVertexArrayOES(...args);
+    gl.bindVertexArray = (...args) => oesVaoExt.bindVertexArrayOES(...args);
+  } else {
+    alert('Your browser does not support OES_vertex_array_object')
+    return;
+  }
 
   webglUtils.resizeCanvasToDisplaySize(gl.canvas);
 

@@ -1,11 +1,11 @@
-const vertexShaderSource = `#version 300 es
+const vertexShaderSource = `
 
 // an attribute is an input (in) to a vertex shader.
 // It will receive data from a buffer
-in vec4 a_position;
-in vec2 a_texcorrd;
+attribute vec4 a_position;
+attribute vec2 a_texcorrd;
 uniform vec2 u_resolution;
-out vec2 v_texcorrd;
+varying vec2 v_texcorrd;
 
 // all shaders have a main function
 void main() {
@@ -20,21 +20,17 @@ void main() {
 }
 `;
 
-const fragmentShaderSource = `#version 300 es
+const fragmentShaderSource = `
 
 // fragment shaders don't have a default precision so we need
 // to pick one. highp is a good default. It means "high precision"
 precision highp float;
 
-in vec2 v_texcorrd;
+varying vec2 v_texcorrd;
 uniform sampler2D u_texture;
 
-// we need to declare an output for the fragment shader
-out vec4 outColor;
-
 void main() {
-  outColor = texture(u_texture, v_texcorrd);
-  // outColor = vec4(0.5, 0.5, 0.5, 1);
+  gl_FragColor = texture2D(u_texture, v_texcorrd);
 }
 `;
 
@@ -42,9 +38,26 @@ document.addEventListener('DOMContentLoaded', async () => {
   const canvas = document.getElementById('glCanvas');
   window.canvas = canvas;
 
-  const gl = canvas.getContext('webgl2');
+  const webgl2 = canvas.getContext('webgl2');
+  const gl = webgl2 || canvas.getContext('webgl');
+  if (webgl2) {
+    gl.webgl2 = true;
+  } else {
+    console.warn('using webgl v1 instead of v2');
+
+    const oesVaoExt = gl.getExtension('OES_vertex_array_object');
+    if (oesVaoExt) {
+      gl.createVertexArray = (...args) => oesVaoExt.createVertexArrayOES(...args);
+      gl.deleteVertexArray = (...args) => oesVaoExt.deleteVertexArrayOES(...args);
+      gl.isVertexArray = (...args) => oesVaoExt.isVertexArrayOES(...args);
+      gl.bindVertexArray = (...args) => oesVaoExt.bindVertexArrayOES(...args);
+    } else {
+      alert('Your browser does not support OES_vertex_array_object')
+      return;
+    }
+  }
   if (!gl) {
-    alert('Your browser does not support webgl2')
+    alert('Your browser does not support webgl')
     return;
   }
   window.gl = gl;
@@ -130,8 +143,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   );
   */
 
-  gl.generateMipmap(gl.TEXTURE_2D);
-
   // https://webgl2fundamentals.org/webgl/lessons/webgl-3d-textures.html
   // how to deal with range < -1 or > +1
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -143,11 +154,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   //gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST_MIPMAP_NEAREST); // choose the best mip, then pick one pixel from that mip
   //gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST); // choose the best mip, then blend 4 pixels from that mip
   //gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST_MIPMAP_LINEAR); // choose the best 2 mips, choose 1 pixel from each, blend them
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); // choose the best 2 mips. choose 4 pixels from each, blend them
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.webgl2 ? gl.LINEAR_MIPMAP_LINEAR : gl.LINEAR); // choose the best 2 mips. choose 4 pixels from each, blend them
 
   // how to deal with zoom in of a texture / how to use mipmap
   //gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST); // choose 1 pixel from the biggest mip
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR); // choose 4 pixels from the biggest mip and blend them
+
+  gl.generateMipmap(gl.TEXTURE_2D);
 
   // In webgl 1, there seems no gl.generateMipmap:
 
