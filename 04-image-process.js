@@ -1,11 +1,11 @@
-const vertexShaderSource = `#version 300 es
+const vertexShaderSource = `
 
 // an attribute is an input (in) to a vertex shader.
 // It will receive data from a buffer
-in vec4 a_position;
-in vec2 a_texcorrd;
+attribute vec4 a_position;
+attribute vec2 a_texcorrd;
 uniform vec2 u_resolution;
-out vec2 v_texcorrd;
+varying vec2 v_texcorrd;
 
 // all shaders have a main function
 void main() {
@@ -20,53 +20,51 @@ void main() {
 }
 `;
 
-const fragmentShaderSource = `#version 300 es
+const fragmentShaderSource = `
 
 // fragment shaders don't have a default precision so we need
 // to pick one. highp is a good default. It means "high precision"
 precision highp float;
 
-in vec2 v_texcorrd;
+varying vec2 v_texcorrd;
 uniform sampler2D u_texture;
-
-// we need to declare an output for the fragment shader
-out vec4 outColor;
+uniform float u_textureSize;
 
 void main() {
   // normal
-  outColor = texture(u_texture, v_texcorrd);
+  gl_FragColor = texture2D(u_texture, v_texcorrd);
 
   // r -> b, g -> r, b -> g
-  // outColor = texture(u_texture, v_texcorrd).brga;
+  // gl_FragColor = texture2D(u_texture, v_texcorrd).brga;
 
   // blur
-  // vec2 onePixel = vec2(1) / vec2(textureSize(u_texture, 0));
-  // outColor = (
-  //   texture(u_texture, v_texcorrd + onePixel * vec2(-2, -2)) +
-  //   texture(u_texture, v_texcorrd + onePixel * vec2(0, -2)) +
-  //   texture(u_texture, v_texcorrd + onePixel * vec2(2, -2)) +
-  //   texture(u_texture, v_texcorrd + onePixel * vec2(-2, 0)) +
-  //   texture(u_texture, v_texcorrd) +
-  //   texture(u_texture, v_texcorrd + onePixel * vec2(2, 0)) +
-  //   texture(u_texture, v_texcorrd + onePixel * vec2(-2, 2)) +
-  //   texture(u_texture, v_texcorrd + onePixel * vec2(0, 2)) +
-  //   texture(u_texture, v_texcorrd + onePixel * vec2(2, 2))
+  // vec2 onePixel = vec2(1) / vec2(u_textureSize);
+  // gl_FragColor = (
+  //   texture2D(u_texture, v_texcorrd + onePixel * vec2(-2, -2)) +
+  //   texture2D(u_texture, v_texcorrd + onePixel * vec2(0, -2)) +
+  //   texture2D(u_texture, v_texcorrd + onePixel * vec2(2, -2)) +
+  //   texture2D(u_texture, v_texcorrd + onePixel * vec2(-2, 0)) +
+  //   texture2D(u_texture, v_texcorrd) +
+  //   texture2D(u_texture, v_texcorrd + onePixel * vec2(2, 0)) +
+  //   texture2D(u_texture, v_texcorrd + onePixel * vec2(-2, 2)) +
+  //   texture2D(u_texture, v_texcorrd + onePixel * vec2(0, 2)) +
+  //   texture2D(u_texture, v_texcorrd + onePixel * vec2(2, 2))
   // ) / 9.0;
 
   // edgeDetect
-  vec2 onePixel = vec2(1) / vec2(textureSize(u_texture, 0));
+  vec2 onePixel = vec2(1) / vec2(u_textureSize);
   vec3 color = (
-    texture(u_texture, v_texcorrd) * 8.0 -
-    texture(u_texture, v_texcorrd + onePixel * vec2(-1, -1)) -
-    texture(u_texture, v_texcorrd + onePixel * vec2(0, -1)) -
-    texture(u_texture, v_texcorrd + onePixel * vec2(1, -1)) -
-    texture(u_texture, v_texcorrd + onePixel * vec2(-1, 0)) -
-    texture(u_texture, v_texcorrd + onePixel * vec2(1, 0)) -
-    texture(u_texture, v_texcorrd + onePixel * vec2(-1, 1)) -
-    texture(u_texture, v_texcorrd + onePixel * vec2(0, 1)) -
-    texture(u_texture, v_texcorrd + onePixel * vec2(1, 1))
+    texture2D(u_texture, v_texcorrd) * 8.0 -
+    texture2D(u_texture, v_texcorrd + onePixel * vec2(-1, -1)) -
+    texture2D(u_texture, v_texcorrd + onePixel * vec2(0, -1)) -
+    texture2D(u_texture, v_texcorrd + onePixel * vec2(1, -1)) -
+    texture2D(u_texture, v_texcorrd + onePixel * vec2(-1, 0)) -
+    texture2D(u_texture, v_texcorrd + onePixel * vec2(1, 0)) -
+    texture2D(u_texture, v_texcorrd + onePixel * vec2(-1, 1)) -
+    texture2D(u_texture, v_texcorrd + onePixel * vec2(0, 1)) -
+    texture2D(u_texture, v_texcorrd + onePixel * vec2(1, 1))
   ).rgb;
-  outColor = 1.0 - vec4(
+  gl_FragColor = 1.0 - vec4(
     (vec3(color.r + color.g + color.b, color.r + color.g + color.b, color.r + color.g + color.b) / 3.0),
     1
   );
@@ -77,12 +75,23 @@ document.addEventListener('DOMContentLoaded', async () => {
   const canvas = document.getElementById('glCanvas');
   window.canvas = canvas;
 
-  const gl = canvas.getContext('webgl2');
+  const gl = canvas.getContext('webgl');
   if (!gl) {
-    alert('Your browser does not support webgl2')
+    alert('Your browser does not support webgl')
     return;
   }
   window.gl = gl;
+
+  const oesVaoExt = gl.getExtension('OES_vertex_array_object');
+  if (oesVaoExt) {
+    gl.createVertexArray = (...args) => oesVaoExt.createVertexArrayOES(...args);
+    gl.deleteVertexArray = (...args) => oesVaoExt.deleteVertexArrayOES(...args);
+    gl.isVertexArray = (...args) => oesVaoExt.isVertexArrayOES(...args);
+    gl.bindVertexArray = (...args) => oesVaoExt.bindVertexArrayOES(...args);
+  } else {
+    alert('Your browser does not support OES_vertex_array_object')
+    return;
+  }
 
   webglUtils.resizeCanvasToDisplaySize(gl.canvas);
 
@@ -95,6 +104,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const texcorrdAttributeLocation = gl.getAttribLocation(program, 'a_texcorrd');
   const resolutionUniformLocation = gl.getUniformLocation(program, 'u_resolution');
   const textureSamplerUniformLocation = gl.getUniformLocation(program, 'u_texture');
+  const textureSizeUniformLocation = gl.getUniformLocation(program, 'u_textureSize');
 
   // vertex array object, has to be above gl.enableVertexAttribArray
   const vao = gl.createVertexArray();
@@ -183,6 +193,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // use texture
   const textureUnit = 3;
   gl.uniform1i(textureSamplerUniformLocation, textureUnit);
+  gl.uniform1f(textureSizeUniformLocation, image.width);
   gl.activeTexture(gl[`TEXTURE${textureUnit}`]); // from gl.TEXTURE0 to gl.TEXTURE31
   gl.bindTexture(gl.TEXTURE_2D, texture);
 

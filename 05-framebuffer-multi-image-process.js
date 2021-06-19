@@ -5,26 +5,43 @@ document.addEventListener('DOMContentLoaded', async () => {
   const canvas = document.getElementById('glCanvas');
   window.canvas = canvas;
 
-  const gl = canvas.getContext('webgl2');
+  const gl = canvas.getContext('webgl');
   if (!gl) {
-    alert('Your browser does not support webgl2')
+    alert('Your browser does not support webgl')
     return;
   }
   window.gl = gl;
+
+  const oesVaoExt = gl.getExtension('OES_vertex_array_object');
+  if (oesVaoExt) {
+    gl.createVertexArray = (...args) => oesVaoExt.createVertexArrayOES(...args);
+    gl.deleteVertexArray = (...args) => oesVaoExt.deleteVertexArrayOES(...args);
+    gl.isVertexArray = (...args) => oesVaoExt.isVertexArrayOES(...args);
+    gl.bindVertexArray = (...args) => oesVaoExt.bindVertexArrayOES(...args);
+  } else {
+    alert('Your browser does not support OES_vertex_array_object')
+    return;
+  }
+
+  const webglDepthTexExt = gl.getExtension('WEBGL_depth_texture');
+  if (!webglDepthTexExt) {
+    gl.webglDepthTexExt = true;
+    console.warn('Your browser does not support WEBGL_depth_texture')
+  }
 
   const mainRenderer = await createMainRenderer(gl);
   renderMain(gl, mainRenderer);
 });
 
-const vertexShaderSource = `#version 300 es
+const vertexShaderSource = `
 
-in vec4 a_position;
-in vec2 a_texcorrd;
+attribute vec4 a_position;
+attribute vec2 a_texcorrd;
 
 uniform vec2 u_resolution;
 uniform float u_zFlip;
 
-out vec2 v_texcorrd;
+varying vec2 v_texcorrd;
 
 void main() {
   gl_Position = vec4(
@@ -34,30 +51,29 @@ void main() {
   v_texcorrd = a_texcorrd;
 }`;
 
-const fragmentShaderSource = `#version 300 es
+const fragmentShaderSource = `
 precision highp float;
 
-in vec2 v_texcorrd;
+varying vec2 v_texcorrd;
 
 uniform mat3 u_kernel;
 uniform float u_kernelWeight;
 
 uniform sampler2D u_texture;
-
-out vec4 outColor;
+uniform float u_textureSize;
 
 void main() {
-  vec2 onePixel = vec2(1) / vec2(textureSize(u_texture, 0));
-  outColor = (
-    texture(u_texture, v_texcorrd + onePixel * vec2(-1, -1)) * u_kernel[0][0] +
-    texture(u_texture, v_texcorrd + onePixel * vec2( 0, -1)) * u_kernel[0][1] +
-    texture(u_texture, v_texcorrd + onePixel * vec2( 1, -1)) * u_kernel[0][2] +
-    texture(u_texture, v_texcorrd + onePixel * vec2(-1,  0)) * u_kernel[1][0] +
-    texture(u_texture, v_texcorrd)                           * u_kernel[1][1] +
-    texture(u_texture, v_texcorrd + onePixel * vec2( 1,  0)) * u_kernel[1][2] +
-    texture(u_texture, v_texcorrd + onePixel * vec2(-1,  1)) * u_kernel[2][0] +
-    texture(u_texture, v_texcorrd + onePixel * vec2( 0,  1)) * u_kernel[2][1] +
-    texture(u_texture, v_texcorrd + onePixel * vec2( 1,  1)) * u_kernel[2][2]
+  vec2 onePixel = vec2(1) / vec2(u_textureSize);
+  gl_FragColor = (
+    texture2D(u_texture, v_texcorrd + onePixel * vec2(-1, -1)) * u_kernel[0][0] +
+    texture2D(u_texture, v_texcorrd + onePixel * vec2( 0, -1)) * u_kernel[0][1] +
+    texture2D(u_texture, v_texcorrd + onePixel * vec2( 1, -1)) * u_kernel[0][2] +
+    texture2D(u_texture, v_texcorrd + onePixel * vec2(-1,  0)) * u_kernel[1][0] +
+    texture2D(u_texture, v_texcorrd)                           * u_kernel[1][1] +
+    texture2D(u_texture, v_texcorrd + onePixel * vec2( 1,  0)) * u_kernel[1][2] +
+    texture2D(u_texture, v_texcorrd + onePixel * vec2(-1,  1)) * u_kernel[2][0] +
+    texture2D(u_texture, v_texcorrd + onePixel * vec2( 0,  1)) * u_kernel[2][1] +
+    texture2D(u_texture, v_texcorrd + onePixel * vec2( 1,  1)) * u_kernel[2][2]
   ) / u_kernelWeight;
 }`;
 
@@ -79,7 +95,7 @@ const KERNELS = {
   ],
 }
 
-const renderingImgSize = [200, 200]
+const renderingImgSize = 200;
 
 async function createMainRenderer(gl) {
   const program = webglUtils.createProgramFromSources(gl, [vertexShaderSource, fragmentShaderSource]);
@@ -100,13 +116,14 @@ async function createMainRenderer(gl) {
   uniforms.kernel = gl.getUniformLocation(program, 'u_kernel');
   uniforms.kernelWeight = gl.getUniformLocation(program, 'u_kernelWeight');
   uniforms.imageTexture = gl.getUniformLocation(program, 'u_texture');
+  uniforms.textureSize = gl.getUniformLocation(program, 'u_textureSize');
 
   // textures
   const textures = {};
   textures.image = createImageTexture(gl, await loadImage('assets/me.png'));
 
   const attachedTextureFramebuffers = [
-    createAttachedTextureFramebuffer(gl, renderingImgSize[0], renderingImgSize[1]),
+    createAttachedTextureFramebuffer(gl, renderingImgSize, renderingImgSize),
   ];
 
   return {
@@ -123,6 +140,8 @@ function renderMain(gl, renderer) {
 
   webglUtils.resizeCanvasToDisplaySize(gl.canvas);
 
+  gl.disable(gl.DEPTH_TEST);
+
   gl.useProgram(program);
   gl.bindVertexArray(vao);
 
@@ -138,14 +157,15 @@ function renderMain(gl, renderer) {
   ]));
 
   // first render to framebuffer[0]
-  bindFramebuffer(gl, attachedTextureFramebuffers[0].framebuffer, renderingImgSize[0], renderingImgSize[1])
+  bindFramebuffer(gl, attachedTextureFramebuffers[0].framebuffer, renderingImgSize, renderingImgSize)
   setPositions(
-    gl, renderingImgSize[0], renderingImgSize[1], // resolutionWidth, resolutionHeight
-    0, 0, renderingImgSize[0], renderingImgSize[1], // x, y, width, height
+    gl, renderingImgSize, renderingImgSize, // resolutionWidth, resolutionHeight
+    0, 0, renderingImgSize, renderingImgSize, // x, y, width, height
     renderer,
   );
   gl.uniform1f(uniforms.zFlip, -1);
   setTextureToUnifrom(gl, 0, uniforms.imageTexture, textures.image);
+  gl.uniform1f(uniforms.textureSize, textures.image.width);
   setKernel(gl, KERNELS.gaussianBlur, renderer);
   gl.drawArrays(gl.TRIANGLES, /* offset: */ 0, /* count: */ 6);
 
@@ -158,11 +178,12 @@ function renderMain(gl, renderer) {
 
   setPositions(
     gl, gl.canvas.width, gl.canvas.height, // resolutionWidth, resolutionHeight
-    100, 50, renderingImgSize[0], renderingImgSize[1], // x, y, width, height
+    100, 50, renderingImgSize, renderingImgSize, // x, y, width, height
     renderer,
   );
   gl.uniform1f(uniforms.zFlip, 1);
   setTextureToUnifrom(gl, 0, uniforms.imageTexture, attachedTextureFramebuffers[0].texture);
+  gl.uniform1f(uniforms.textureSize, renderingImgSize);
   setKernel(gl, KERNELS.edgeDetect, renderer);
   gl.drawArrays(gl.TRIANGLES, /* offset: */ 0, /* count: */ 6);
 }
@@ -232,40 +253,42 @@ function createAttachedTextureFramebuffer(gl, width, height) {
     console.error('framebuffer (color) insufficient / not supported');
   }
 
-  // depthTexture
+  let depthTexture;
   // does not have visual effect here, just learn about:
   // https://webgl2fundamentals.org/webgl/lessons/webgl-render-to-texture.html
   // to provide gl.enable(gl.DEPTH_TEST) for texture as framebuffer
-  const depthTexture = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, depthTexture);
+  if (gl.webglDepthTexExt) {
+    depthTexture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, depthTexture);
 
-  gl.texImage2D(
-    gl.TEXTURE_2D,
-    0, // level
-    gl.DEPTH_COMPONENT24, // internalFormat
-    width, height, 0, // border
-    gl.DEPTH_COMPONENT, // format
-    gl.UNSIGNED_INT, // type
-    null, // data
-  );
+    gl.texImage2D(
+      gl.TEXTURE_2D,
+      0, // level
+      gl.DEPTH_COMPONENT, // internalFormat
+      width, height, 0, // border
+      gl.DEPTH_COMPONENT, // format
+      gl.UNSIGNED_INT, // type
+      null, // data
+    );
 
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
-  gl.framebufferTexture2D(
-    gl.FRAMEBUFFER,
-    gl.DEPTH_ATTACHMENT, // attachmentPoint
-    gl.TEXTURE_2D,
-    depthTexture,
-    0, // level
-  );
+    gl.framebufferTexture2D(
+      gl.FRAMEBUFFER,
+      gl.DEPTH_ATTACHMENT, // attachmentPoint
+      gl.TEXTURE_2D,
+      depthTexture,
+      0, // level
+    );
+  }
 
   if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
     console.error('framebuffer (depth) insufficient / not supported');
   }
-  return { texture, framebuffer };
+  return { texture, depthTexture, framebuffer };
 }
 
 function getKernelWeight(kernel) {
