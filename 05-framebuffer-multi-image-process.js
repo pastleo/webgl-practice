@@ -1,7 +1,10 @@
 import { createImageTexture, createAttributeBuffer, transferToBuffer, setTextureToUnifrom } from './lib/gl.js';
 import { loadImage } from './lib/utils.js';
+import devModePromise from './lib/dev.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
+  await devModePromise;
+
   const canvas = document.getElementById('glCanvas');
   window.canvas = canvas;
 

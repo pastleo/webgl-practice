@@ -1,13 +1,31 @@
 import { createAttributeBuffer, transferToBuffer } from './lib/gl.js';
 import { matrix4 } from './lib/matrix.js';
 import { pipe } from './lib/utils.js';
+import devModePromise from './lib/dev.js';
 
 // to see 2D version, git checkout a8bd7ef
 // (basically the end of https://webgl2fundamentals.org/webgl/lessons/webgl-2d-matrices.html)
 document.addEventListener('DOMContentLoaded', async () => {
+  await devModePromise;
+
   const canvas = document.getElementById('canvas');
-  const gl = canvas.getContext('webgl2');
+  const gl = canvas.getContext('webgl');
+  if (!gl) {
+    alert('Your browser does not support webgl')
+    return;
+  }
   window.gl = gl;
+
+  const oesVaoExt = gl.getExtension('OES_vertex_array_object');
+  if (oesVaoExt) {
+    gl.createVertexArray = (...args) => oesVaoExt.createVertexArrayOES(...args);
+    gl.deleteVertexArray = (...args) => oesVaoExt.deleteVertexArrayOES(...args);
+    gl.isVertexArray = (...args) => oesVaoExt.isVertexArrayOES(...args);
+    gl.bindVertexArray = (...args) => oesVaoExt.bindVertexArrayOES(...args);
+  } else {
+    alert('Your browser does not support OES_vertex_array_object')
+    return;
+  }
 
   const defaultRotationInRadians = [30, 30, 0];
   const controls = {
@@ -55,17 +73,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 });
 
-const vertexShaderSource = `#version 300 es
+const vertexShaderSource = `
 
 // an attribute is an input (in) to a vertex shader.
 // It will receive data from a buffer
-in vec4 a_position;
-in vec4 a_color;
+attribute vec4 a_position;
+attribute vec4 a_color;
 
 // A matrix to transform the positions by
 uniform mat4 u_matrix;
 
-out vec4 v_color;
+varying vec4 v_color;
 
 // all shaders have a main function
 void main() {
@@ -75,17 +93,14 @@ void main() {
 }
 `;
 
-const fragmentShaderSource = `#version 300 es
+const fragmentShaderSource = `
 
 precision highp float;
 
-in vec4 v_color;
-
-// we need to declare an output for the fragment shader
-out vec4 outColor;
+varying vec4 v_color;
 
 void main() {
-  outColor = v_color;
+  gl_FragColor = v_color;
 }
 `;
 

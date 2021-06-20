@@ -1,14 +1,29 @@
 import * as rendererOri from './06-translation-renderer-ori.js';
 import * as rendererTranform from './06-translation-renderer-transform.js';
+import devModePromise from './lib/dev.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
+  await devModePromise;
+
   const canvas = document.getElementById('glCanvas');
-  const gl = canvas.getContext('webgl2');
+  const gl = canvas.getContext('webgl');
   if (!gl) {
-    alert('Your browser does not support webgl2')
+    alert('Your browser does not support webgl')
     return;
   }
   window.gl = gl;
+
+  const oesVaoExt = gl.getExtension('OES_vertex_array_object');
+  if (oesVaoExt) {
+    gl.createVertexArray = (...args) => oesVaoExt.createVertexArrayOES(...args);
+    gl.deleteVertexArray = (...args) => oesVaoExt.deleteVertexArrayOES(...args);
+    gl.isVertexArray = (...args) => oesVaoExt.isVertexArrayOES(...args);
+    gl.bindVertexArray = (...args) => oesVaoExt.bindVertexArrayOES(...args);
+  } else {
+    alert('Your browser does not support OES_vertex_array_object')
+    return;
+  }
+
   const oriRender = await rendererOri.createRenderer(gl);
   const transformRender = await rendererTranform.createRenderer(gl);
   const render = () => {

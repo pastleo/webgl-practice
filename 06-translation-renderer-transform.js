@@ -2,15 +2,15 @@ import { pipe, loadImage } from './lib/utils.js';
 import { createImageTexture, createAttributeBuffer, transferToBuffer, setTextureToUnifrom } from './lib/gl.js';
 import { matrix3 } from './lib/matrix.js';
 
-const vertexShaderSourceOri = `#version 300 es
+const vertexShaderSourceOri = `
 
-in vec2 a_position;
-in vec2 a_texcorrd;
+attribute vec2 a_position;
+attribute vec2 a_texcorrd;
 
 uniform vec2 u_resolution;
 uniform mat3 u_transform;
 
-out vec2 v_texcorrd;
+varying vec2 v_texcorrd;
 
 void main() {
   gl_Position = vec4(
@@ -20,17 +20,16 @@ void main() {
   v_texcorrd = a_texcorrd;
 }
 `;
-const fragmentShaderSource = `#version 300 es
+const fragmentShaderSource = `
 precision highp float;
 
-in vec2 v_texcorrd;
+varying vec2 v_texcorrd;
 uniform vec2 u_resolution;
 
 uniform sampler2D u_texture;
-out vec4 outColor;
 
 void main() {
-  outColor = texture(u_texture, v_texcorrd / u_resolution);
+  gl_FragColor = texture2D(u_texture, v_texcorrd / u_resolution);
 }
 `;
 

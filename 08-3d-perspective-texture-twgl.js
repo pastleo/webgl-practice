@@ -1,55 +1,69 @@
 import * as twgl from './vendor/twgl-full.module.js';
 import { pipe, radToDeg, degToRad, createSlider } from './lib/utils.js';
 import { matrix4 } from './lib/matrix.js';
+import devModePromise from './lib/dev.js';
 
-const colorVertexShader = `#version 300 es
+const colorVertexShader = `
 
-in vec4 a_position;
-in vec4 a_color;
+attribute vec4 a_position;
+attribute vec4 a_color;
 uniform mat4 u_matrix;
-out vec4 v_color;
+varying vec4 v_color;
 
 void main() {
   gl_Position = u_matrix * a_position;
   v_color = a_color;
 }`;
-const colorFragmentShader = `#version 300 es
+const colorFragmentShader = `
 precision highp float;
 
-in vec4 v_color;
-out vec4 outColor;
+varying vec4 v_color;
 
 void main() {
-   outColor = v_color;
+   gl_FragColor = v_color;
 }`;
 
-const texVertexShader = `#version 300 es
+const texVertexShader = `
 
-in vec4 a_position;
-in vec2 a_texcoord;
+attribute vec4 a_position;
+attribute vec2 a_texcoord;
 uniform mat4 u_matrix;
-out vec2 v_texcoord;
+varying vec2 v_texcoord;
 
 void main() {
   gl_Position = u_matrix * a_position;
   v_texcoord = a_texcoord;
 }`;
-const texFragmentShader = `#version 300 es
+const texFragmentShader = `
 precision highp float;
 
-in vec2 v_texcoord;
+varying vec2 v_texcoord;
 uniform sampler2D u_texture;
-out vec4 outColor;
 
 void main() {
-   outColor = texture(u_texture, v_texcoord);
+   gl_FragColor = texture2D(u_texture, v_texcoord);
 }`;
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  await devModePromise;
+
   const canvas = document.getElementById('canvas');
-  const gl = canvas.getContext('webgl2');
+
+  const gl = canvas.getContext('webgl');
   if (!gl) {
-    alert('Your browser does not support webgl2')
+    alert('Your browser does not support webgl')
+    return;
+  }
+  window.gl = gl;
+
+  const oesVaoExt = gl.getExtension('OES_vertex_array_object');
+  if (oesVaoExt) {
+    gl.createVertexArray = (...args) => oesVaoExt.createVertexArrayOES(...args);
+    gl.deleteVertexArray = (...args) => oesVaoExt.deleteVertexArrayOES(...args);
+    gl.isVertexArray = (...args) => oesVaoExt.isVertexArrayOES(...args);
+    gl.bindVertexArray = (...args) => oesVaoExt.bindVertexArrayOES(...args);
+  } else {
+    alert('Your browser does not support OES_vertex_array_object')
     return;
   }
 

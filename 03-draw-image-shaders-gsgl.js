@@ -1,3 +1,5 @@
+import devModePromise from './lib/dev.js';
+
 const vertexShaderSource = `
 
 // an attribute is an input (in) to a vertex shader.
@@ -35,6 +37,8 @@ void main() {
 `;
 
 document.addEventListener('DOMContentLoaded', async () => {
+  await devModePromise;
+
   const canvas = document.getElementById('glCanvas');
   window.canvas = canvas;
 

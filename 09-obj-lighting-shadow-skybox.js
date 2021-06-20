@@ -4,6 +4,8 @@ import * as WebGLObjLoader from './vendor/webgl-obj-loader.esm.js';
 import { loadImage, pipe, radToDeg, degToRad } from './lib/utils.js';
 import { matrix4 } from './lib/matrix.js';
 
+import devModePromise from './lib/dev.js';
+
 const lightPosition = [-15, 30, 40];
 const sceneData = {
   camera: {
@@ -19,7 +21,6 @@ const sceneData = {
     scale: [1, 1, 1],
     projectionSize: 2048,
     shadowBias: 0.001,
-    shadowSampleStep: 2,
     shadowSampleStepSize: 0.001,
   },
   skybox: {
@@ -127,10 +128,29 @@ const sceneData = {
 };
 
 document.addEventListener('DOMContentLoaded', async () => {
+  await devModePromise;
+
   const canvas = document.getElementById('canvas');
-  const gl = canvas.getContext('webgl2');
+  const gl = canvas.getContext('webgl');
   if (!gl) {
-    alert('Your browser does not support webgl2')
+    alert('Your browser does not support webgl')
+    return;
+  }
+  window.gl = gl;
+
+  const oesVaoExt = gl.getExtension('OES_vertex_array_object');
+  if (oesVaoExt) {
+    gl.createVertexArray = (...args) => oesVaoExt.createVertexArrayOES(...args);
+    gl.deleteVertexArray = (...args) => oesVaoExt.deleteVertexArrayOES(...args);
+    gl.isVertexArray = (...args) => oesVaoExt.isVertexArrayOES(...args);
+    gl.bindVertexArray = (...args) => oesVaoExt.bindVertexArrayOES(...args);
+  } else {
+    alert('Your browser does not support OES_vertex_array_object')
+    return;
+  }
+  const webglDepthTexExt = gl.getExtension('WEBGL_depth_texture');
+  if (!webglDepthTexExt) {
+    alert('Your browser does not support WEBGL_depth_texture')
     return;
   }
 
@@ -184,72 +204,69 @@ document.addEventListener('DOMContentLoaded', async () => {
   requestAnimationFrame(renderLoop);
 });
 
-const colorVS = `#version 300 es
+const colorVS = `
 
-in vec4 a_position;
-in vec4 a_color;
+attribute vec4 a_position;
+attribute vec4 a_color;
 uniform mat4 u_matrix;
-out vec4 v_color;
+varying vec4 v_color;
 
 void main() {
   gl_Position = u_matrix * a_position;
   v_color = a_color;
 }`;
-const colorFS = `#version 300 es
+const colorFS = `
 precision highp float;
 
-in vec4 v_color;
-out vec4 outColor;
+varying vec4 v_color;
 
 void main() {
-   outColor = v_color;
+   gl_FragColor = v_color;
 }`;
 
-const texVS = `#version 300 es
+const texVS = `
 
-in vec4 a_position;
-in vec2 a_texcoord;
+attribute vec4 a_position;
+attribute vec2 a_texcoord;
 uniform mat4 u_matrix;
-out vec2 v_texcoord;
+varying vec2 v_texcoord;
 
 void main() {
   gl_Position = u_matrix * a_position;
   v_texcoord = a_texcoord;
 }`;
-const texFS = `#version 300 es
+const texFS = `
 precision highp float;
 
-in vec2 v_texcoord;
+varying vec2 v_texcoord;
 uniform sampler2D u_texture;
-out vec4 outColor;
 
 void main() {
-   outColor = texture(u_texture, v_texcoord);
+   gl_FragColor = texture2D(u_texture, v_texcoord);
 }`;
 
-const uniColorVS = `#version 300 es
+const uniColorVS = `
 
-in vec4 a_position;
+attribute vec4 a_position;
 uniform mat4 u_matrix;
 
 void main() {
   gl_Position = u_matrix * a_position;
 }`;
-const uniColorFS = `#version 300 es
+const uniColorFS = `
 precision highp float;
 
-out vec4 outColor;
 uniform vec3 u_color;
 
 void main() {
-   outColor = vec4(u_color, 1.0);
+   gl_FragColor = vec4(u_color, 1.0);
 }`;
 
-const mtlVS = `#version 300 es
+const mtlVS = `
 
-in vec4 a_position;
-in vec2 a_texcoord;
-in vec3 a_normal;
+attribute vec4 a_position;
+attribute vec2 a_texcoord;
+attribute vec3 a_normal;
 
 uniform mat4 u_matrix;
 uniform mat4 u_world;
@@ -259,12 +276,12 @@ uniform vec3 u_worldLightPosition;
 uniform vec3 u_worldViewerPosition;
 uniform mat4 u_lightProjectionMatrix;
 
-out vec2 v_texcoord;
-out vec3 v_normal;
-out vec3 v_worldPosition;
-out vec3 v_surfaceToLight;
-out vec3 v_surfaceToViewer;
-out vec4 v_lightProjection;
+varying vec2 v_texcoord;
+varying vec3 v_normal;
+varying vec3 v_worldPosition;
+varying vec3 v_surfaceToLight;
+varying vec3 v_surfaceToViewer;
+varying vec4 v_lightProjection;
 
 void main() {
   gl_Position = u_matrix * a_position;
@@ -280,21 +297,20 @@ void main() {
 }
 `;
 
-const mtlFS = `#version 300 es
+const mtlFS = `
 precision highp float;
 
-in vec2 v_texcoord;
-in vec3 v_normal;
-in vec3 v_worldPosition;
-in vec3 v_surfaceToLight;
-in vec3 v_surfaceToViewer;
-in vec4 v_lightProjection;
+#define LIGHT_SHADOW_SAMPLE_STEP 2
 
-out vec4 outColor;
+varying vec2 v_texcoord;
+varying vec3 v_normal;
+varying vec3 v_worldPosition;
+varying vec3 v_surfaceToLight;
+varying vec3 v_surfaceToViewer;
+varying vec4 v_lightProjection;
 
 uniform sampler2D u_lightProjectionMap;
 uniform float u_lightShadowBias;
-uniform int u_lightShadowSampleStep;
 uniform float u_lightShadowSampleStepSize;
 
 uniform vec4 u_diffuse;
@@ -338,8 +354,8 @@ void main() {
   float specular = diffuse >= 0.0 ? pow(dot(halfVector, normal), u_specularExponent) : 0.0;
 
   vec4 u_diffuseMapColor = mix(
-    texture(u_diffuseMap, v_texcoord),
-    texture(u_skyboxMap, reflect(-surfaceToViewerDirection, normal)),
+    texture2D(u_diffuseMap, v_texcoord),
+    textureCube(u_skyboxMap, reflect(-surfaceToViewerDirection, normal)),
     u_reflective
   );
   vec4 diffuseColor = u_diffuseMapColor * u_diffuse;
@@ -359,7 +375,7 @@ void main() {
   diffuseHSV.y *= (1.0 - diffuse * diffuse * 0.6 * (1.0 - u_reflective));
   diffuseHSV.z *= diffuse * 0.5 + 0.5;
 
-  outColor = vec4(
+  gl_FragColor = vec4(
     hsv2rgb(diffuseHSV) +
     u_ambient * u_ambientLight +
     u_specular * specular +
@@ -370,9 +386,9 @@ void main() {
 
 float lightProjectedFactor(float lightToSurfaceDepth, vec2 lightProjectionCoord) {
   float factor = 0.0;
-  for(int i = -u_lightShadowSampleStep; i <= u_lightShadowSampleStep; i++) {
-    for(int j = -u_lightShadowSampleStep; j <= u_lightShadowSampleStep; j++) {
-      float lightProjectedDepth = texture(
+  for(int i = -LIGHT_SHADOW_SAMPLE_STEP; i <= LIGHT_SHADOW_SAMPLE_STEP; i++) {
+    for(int j = -LIGHT_SHADOW_SAMPLE_STEP; j <= LIGHT_SHADOW_SAMPLE_STEP; j++) {
+      float lightProjectedDepth = texture2D(
         u_lightProjectionMap,
         lightProjectionCoord + vec2(float(i)*u_lightShadowSampleStepSize, float(j)*u_lightShadowSampleStepSize)
       ).r;
@@ -380,7 +396,7 @@ float lightProjectedFactor(float lightToSurfaceDepth, vec2 lightProjectionCoord)
     }
   }
 
-  return factor / float((u_lightShadowSampleStep * 2 + 1) * (u_lightShadowSampleStep * 2 + 1));
+  return factor / float((LIGHT_SHADOW_SAMPLE_STEP * 2 + 1) * (LIGHT_SHADOW_SAMPLE_STEP * 2 + 1));
 }
 
 vec3 rgb2hsv(vec3 c){
@@ -445,27 +461,26 @@ float noise3D(in vec3 coord, in float wavelength)
 }
 `
 
-const skyboxVS = `#version 300 es
+const skyboxVS = `
 
-in vec4 a_position;
+attribute vec4 a_position;
 uniform mat4 u_matrix;
 
-out vec3 v_normal;
+varying vec3 v_normal;
 
 void main() {
   gl_Position = vec4(a_position.xy, 1.0, 1.0);
   v_normal = (u_matrix * a_position).xyz;
 }`;
-const skyboxFS = `#version 300 es
+const skyboxFS = `
 precision highp float;
 
-in vec3 v_normal;
+varying vec3 v_normal;
 
-out vec4 outColor;
 uniform samplerCube u_skyboxMap;
 
 void main() {
-  outColor = texture(u_skyboxMap, normalize(v_normal));
+  gl_FragColor = textureCube(u_skyboxMap, normalize(v_normal));
 }`;
 
 const programOptions = {
@@ -628,7 +643,7 @@ function createLightProjectionInfo(gl, lightData) {
   gl.texImage2D(
     gl.TEXTURE_2D,
     0, // level
-    gl.DEPTH_COMPONENT24, // internalFormat
+    gl.DEPTH_COMPONENT, // internalFormat
     lightData.projectionSize, // width
     lightData.projectionSize, // height
     0, // border
@@ -717,7 +732,7 @@ function render(gl, scene, timeStamp) {
   gl.enable(gl.CULL_FACE);
   gl.enable(gl.DEPTH_TEST);
 
-  twgl.resizeCanvasToDisplaySize(gl.canvas);
+  twgl.resizeCanvasToDisplaySize(gl.canvas, window.devicePixelRatio || 1);
 
   const { lightProjectionMatrix } = renderLightProjection(gl, scene);
 
@@ -750,7 +765,6 @@ function render(gl, scene, timeStamp) {
     u_lightProjectionMatrix: lightProjectionMatrix,
     u_lightProjectionMap: lightProjection.lightProjectionMap,
     u_lightShadowBias: light.shadowBias,
-    u_lightShadowSampleStep: light.shadowSampleStep,
     u_lightShadowSampleStepSize: light.shadowSampleStepSize,
     u_skyboxMap: scene.skybox.texture,
     u_normalNoiseRange: 500,
