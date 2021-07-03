@@ -11,24 +11,41 @@ const mainVS = `
 precision highp float;
 
 attribute vec4 a_position;
-attribute vec3 a_color;
-uniform mat4 u_matrix;
+attribute vec3 a_normal;
 
-varying vec3 v_color;
+uniform mat4 u_view;
+uniform mat4 u_world;
+uniform mat4 u_worldInverseTranspose;
+
+varying vec3 v_normal;
 
 void main() {
-  gl_Position = u_matrix * a_position;
-  v_color = a_color;
+  gl_Position = u_view * u_world * a_position;
+  v_normal = (u_worldInverseTranspose * vec4(a_normal, 1)).xyz;
 }
 `;
 const mainFS = `
 precision highp float;
 
-varying vec3 v_color;
+varying vec3 v_normal;
+
+uniform vec3 u_lightDir;
+uniform vec3 u_ambientLight;
+
+uniform vec4 u_diffuse;
+uniform vec3 u_ambient;
+uniform vec3 u_emissive;
 
 void main() {
-  gl_FragColor = vec4(v_color, 1);
-  //gl_FragColor = vec4(0.5, 0.5, 0.5, 1);
+  vec3 normal = normalize(v_normal);
+  float diffuseLight = clamp(dot(-normalize(u_lightDir), normal), 0.0, 1.0);
+  
+  gl_FragColor = vec4(
+    u_diffuse.rgb * diffuseLight +
+    u_ambient * u_ambientLight +
+    u_emissive,
+    u_diffuse.a
+  );
 }
 `;
 
@@ -125,7 +142,14 @@ function render(gl, rendering, scene) {
       gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
       gl.useProgram(rendering.programInfo.program);
       twgl.setUniforms(rendering.programInfo, {
-        u_matrix: matrix4.multiply(viewMatrix, worldMatrix),
+        u_view: viewMatrix,
+        u_world: worldMatrix,
+        u_worldInverseTranspose: matrix4.transpose(matrix4.inverse(worldMatrix)),
+        u_lightDir: [-1, -1, 0],
+        u_ambientLight: [0, 0, 0],
+        u_diffuse: [107/255, 222/255, 153/255, 1],
+        u_ambient: [0, 0, 0],
+        u_emissive: [0, 0, 0],
       });
       twgl.drawBufferInfo(gl, rendering.coneBufferInfo);
     }
