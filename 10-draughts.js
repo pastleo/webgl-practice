@@ -1,6 +1,9 @@
 import * as twgl from './vendor/twgl-full.module.js';
+
+import listenToInputs from './lib/10-draughts/input.js';
+
 import { matrix4 } from './lib/matrix.js';
-import { pipe, degToRad, radToDeg } from './lib/utils.js';
+import { pipe, degToRad } from './lib/utils.js';
 
 import devModePromise from './lib/dev.js';
 
@@ -71,81 +74,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   const scene = {
     cameraAngle: [degToRad(-20), 0],
     cameraViewing: [0, 0, 0],
+    cameraDistance: 10,
   }
-  const input = {};
 
-  document.addEventListener('keydown', event => {
-    input[event.code] = true;
-  })
-  document.addEventListener('keyup', event => {
-    input[event.code] = false;
-  })
-  document.addEventListener('keyup', event => {
-    input[event.code] = false;
-  })
-  canvas.addEventListener('mousedown', event => {
-    input.mousedown = true;
-    input.mouseClient = [event.clientX, event.clientY];
-  })
-  canvas.addEventListener('mouseup', () => {
-    input.mousedown = false;
-  })
-  canvas.addEventListener('touchstart', event => {
-    input.touched = true;
-    input.touchClient = [event.touches[0].clientX, event.touches[0].clientY];
-  })
-  canvas.addEventListener('touchend', () => {
-    input.touched = false;
-    delete input.multiTouchClient;
-  })
-
-  const moveCameraAngle = (clientX, clientY, preClientX, preClientY) => {
-    scene.cameraAngle[0] += (preClientY - clientY) / 100;
-    if (scene.cameraAngle[0] > 0) {
-      scene.cameraAngle[0] = 0;
-    } else if (scene.cameraAngle[0] < degToRad(-60)) {
-      scene.cameraAngle[0] = degToRad(-60);
-    }
-    scene.cameraAngle[1] += (preClientX - clientX) / (100 * window.devicePixelRatio);
-  };
-  const moveViewing = viewingMove => {
-    scene.cameraViewing[0] += viewingMove[0] * Math.cos(-scene.cameraAngle[1]) - viewingMove[1] * Math.sin(-scene.cameraAngle[1]);
-    scene.cameraViewing[2] += viewingMove[0] * Math.sin(-scene.cameraAngle[1]) + viewingMove[1] * Math.cos(-scene.cameraAngle[1]);
-  };
-
-  canvas.addEventListener('mousemove', event => {
-    if (input.mousedown) {
-      const { clientX, clientY } = event;
-      const [preClientX, preClientY] = input.mouseClient;
-
-      moveCameraAngle(clientX, clientY, preClientX, preClientY);
-
-      input.mouseClient = [clientX, clientY];
-    }
-  })
-  canvas.addEventListener('touchmove', event => {
-    event.preventDefault();
-
-    if (input.touched) {
-      if (event.touches.length >= 2) {
-        const clientX = (event.touches[0].clientX + event.touches[1].clientX) / 2;
-        const clientY = (event.touches[0].clientY + event.touches[1].clientY) / 2;
-
-        if (input.multiTouchClient) {
-          const [preClientX, preClientY] = input.multiTouchClient;
-          moveViewing([(preClientX - clientX) / 100, (preClientY - clientY) / 100]);
-        }
-        input.multiTouchClient = [clientX, clientY];
-      } else {
-        const { clientX, clientY } = event.touches[0];
-        const [preClientX, preClientY] = input.touchClient;
-
-        moveCameraAngle(clientX, clientY, preClientX, preClientY);
-
-        input.touchClient = [clientX, clientY];
-      }
-    }
-  })
+  const input = listenToInputs(canvas, scene);
 
   const renderLoop = () => {
     render(gl, rendering, scene);
@@ -161,7 +93,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else if (input.KeyS) {
       viewingMove[1] += 0.1;
     }
-    moveViewing(viewingMove);
+    input.moveViewing(viewingMove);
 
     requestAnimationFrame(renderLoop);
   }
@@ -178,7 +110,7 @@ function render(gl, rendering, scene) {
     m => matrix4.translate(m, ...scene.cameraViewing),
     m => matrix4.yRotate(m, scene.cameraAngle[1]),
     m => matrix4.xRotate(m, scene.cameraAngle[0]),
-    m => matrix4.translate(m, 0, 0, 10),
+    m => matrix4.translate(m, 0, 0, scene.cameraDistance),
   );
 
   const viewMatrix = matrix4.multiply(projectionMatrix, matrix4.inverse(cameraMatrix));
