@@ -18,29 +18,42 @@ uniform mat4 u_world;
 uniform mat4 u_worldInverseTranspose;
 
 varying vec3 v_normal;
+varying vec3 v_surface;
 
 void main() {
   gl_Position = u_view * u_world * a_position;
   v_normal = (u_worldInverseTranspose * vec4(a_normal, 1)).xyz;
+  v_surface = (u_world * a_position).xyz;
 }
 `;
 const mainFS = `
 precision highp float;
 
 varying vec3 v_normal;
+varying vec3 v_surface;
 
 uniform vec3 u_lightDir;
 uniform vec3 u_ambientLight;
+uniform vec3 u_cameraPosition;
 
 uniform vec4 u_diffuse;
 uniform vec3 u_ambient;
 uniform vec3 u_emissive;
+uniform vec3 u_specular;
+uniform float u_shininess;
 
 void main() {
   vec3 normal = normalize(v_normal);
-  float diffuseLight = clamp(dot(-normalize(u_lightDir), normal), 0.0, 1.0);
+  vec3 surfaceToLight = normalize(-u_lightDir);
+  float diffuseLight = clamp(dot(surfaceToLight, normal), 0.0, 1.0);
+
+  vec3 surfaceToCamera = normalize(u_cameraPosition - v_surface);
+  vec3 halfVector = normalize(surfaceToCamera + surfaceToLight);
+
+  float specularLight = diffuseLight > 0.0 ? pow(dot(halfVector, normal), u_shininess) : 0.0;
   
   gl_FragColor = vec4(
+    u_specular * specularLight +
     u_diffuse.rgb * diffuseLight +
     u_ambient * u_ambientLight +
     u_emissive,
@@ -145,11 +158,14 @@ function render(gl, rendering, scene) {
         u_view: viewMatrix,
         u_world: worldMatrix,
         u_worldInverseTranspose: matrix4.transpose(matrix4.inverse(worldMatrix)),
+        u_cameraPosition: cameraMatrix.slice(12, 15),
         u_lightDir: [-1, -1, 0],
         u_ambientLight: [0, 0, 0],
         u_diffuse: [107/255, 222/255, 153/255, 1],
         u_ambient: [0, 0, 0],
         u_emissive: [0, 0, 0],
+        u_specular: [1, 1, 1],
+        u_shininess: 40,
       });
       twgl.drawBufferInfo(gl, rendering.coneBufferInfo);
     }
