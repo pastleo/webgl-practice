@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const canvas = document.getElementById('main');
   const gl = canvas.getContext('webgl');
   if (!gl) {
-    alert('Your browser does not support webgl')
+    alert('Your browser does not support WebGL')
     return;
   }
   window.gl = gl;
@@ -26,13 +26,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     gl.isVertexArray = (...args) => oesVaoExt.isVertexArrayOES(...args);
     gl.bindVertexArray = (...args) => oesVaoExt.bindVertexArrayOES(...args);
   } else {
-    alert('Your browser does not support OES_vertex_array_object')
+    alert('Your browser does not support WebGL ext: OES_vertex_array_object')
     return;
   }
 
   const webglDepthTexExt = gl.getExtension('WEBGL_depth_texture');
   if (!webglDepthTexExt) {
-    alert('Your browser does not support WEBGL_depth_texture')
+    alert('Your browser does not support WebGL ext: WEBGL_depth_texture')
+    return;
+  }
+
+  const angleInstancedArrayExt = gl.getExtension('ANGLE_instanced_arrays');
+  if (angleInstancedArrayExt) {
+    gl.drawArraysInstanced = (...args) => angleInstancedArrayExt.drawArraysInstancedANGLE(...args);
+    gl.drawElementsInstanced = (...args) => angleInstancedArrayExt.drawElementsInstancedANGLE(...args);
+    gl.vertexAttribDivisor = (...args) => angleInstancedArrayExt.vertexAttribDivisorANGLE(...args);
+  } else {
+    alert('Your browser does not support WebGL ext: ANGLE_instanced_arrays')
     return;
   }
 
@@ -80,12 +90,72 @@ function initRendering(gl) {
   { // cone
     const vertices = twgl.primitives.createTruncatedConeVertices(1, 0, 2, 30, 30);
 
-    const bufferInfo = twgl.createBufferInfoFromArrays(gl, vertices);
-    const vao = twgl.createVAOFromBufferInfo(gl, programs.main, bufferInfo);
-    bufferVaos.cone = { bufferInfo, vao };
+    const vao = gl.createVertexArray();
+    gl.bindVertexArray(vao);
 
+    [['normal', 3], ['position', 3], ['texcoord', 2]].forEach(([attr, size]) => {
+      const attribLocation = programs.main.attribSetters[`a_${attr}`].location;
+      gl.enableVertexAttribArray(attribLocation);
 
+      const buffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+      gl.bufferData(gl.ARRAY_BUFFER, vertices[attr], gl.STATIC_DRAW);
+
+      gl.vertexAttribPointer( // point to latest bindBuffer
+        attribLocation,
+        size,
+        gl.FLOAT, // type
+        false, // normalize
+        0, // stride
+        0, // offset
+      );
+    })
+
+    { // ai_translate
+      const attribLocation = programs.main.attribSetters.ai_translate.location;
+      gl.enableVertexAttribArray(attribLocation);
+
+      const buffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+        1, 0, 0, // instance [0]
+        -1, 0, 0, // instance [1]
+      ]), gl.STATIC_DRAW);
+
+      gl.vertexAttribPointer( // point to latest bindBuffer
+        attribLocation,
+        3,
+        gl.FLOAT, // type
+        false, // normalize
+        0, // stride
+        0, // offset
+      );
+
+      gl.vertexAttribDivisor(attribLocation, 1);
+    }
+
+    // using indices
+    const indicesBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indicesBuffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, vertices.indices, gl.STATIC_DRAW);
+
+    bufferVaos.cone = {
+      bufferInfo: {
+        numElements: vertices.indices.length,
+        indices: indicesBuffer,
+        elementType: gl.UNSIGNED_SHORT,
+        instance: 2,
+      }, vao,
+    };
+
+    // !!! important:
+    gl.bindVertexArray(null);
+
+    // using twgl without instance:
+    //const bufferInfo = twgl.createBufferInfoFromArrays(gl, vertices);
+    //const vao = twgl.createVAOFromBufferInfo(gl, programs.main, bufferInfo);
   }
+
   { // xyQuad
     const vertices = twgl.primitives.createXYQuadVertices();
 
@@ -193,7 +263,15 @@ function renderObjects(gl, rendering, programInfo) {
       u_shininess: 300,
     });
     gl.bindVertexArray(rendering.bufferVaos.cone.vao);
-    twgl.drawBufferInfo(gl, rendering.bufferVaos.cone.bufferInfo);
+    gl.drawElementsInstanced(
+      gl.TRIANGLES,
+      rendering.bufferVaos.cone.bufferInfo.numElements,
+      rendering.bufferVaos.cone.bufferInfo.elementType,
+      0, // offset
+      rendering.bufferVaos.cone.bufferInfo.instance,
+    );
+    //gl.drawArraysInstanced(gl.TRIANGLES, 0, rendering.bufferVaos.cone.bufferInfo.numElements, 2);
+    //twgl.drawBufferInfo(gl, rendering.bufferVaos.cone.bufferInfo);
   }
 
   { // draw ground
