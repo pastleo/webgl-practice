@@ -48,21 +48,34 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   twgl.setAttributePrefix('a_');
 
-  const scene = {
+  const game = {
     cameraAngle: [degToRad(-20), 0],
     cameraViewing: [0, 0, 0],
     cameraDistance: 10,
     lightAngle: [degToRad(45), degToRad(30)],
     maxCoord: [25, 25, 4],
+
+    pieces: [
+      { coord: [0, 0], team: 'y' },
+      { coord: [1, 0], team: 'y' },
+      { coord: [0, -1], team: 'b' },
+      { coord: [-1, -1], team: 'g' },
+      { coord: [-1, 0], team: 'y' },
+      { coord: [0, 1], team: 'y' },
+      { coord: [1, 1], team: 'y' },
+
+
+      { coord: [0, -2], team: 'b' },
+    ],
   }
 
-  const input = listenToInputs(canvas, scene);
-  const rendering = initRendering(gl);
+  const input = listenToInputs(canvas, game);
+  const rendering = initRendering(gl, game);
 
   console.log(rendering);
 
   const renderLoop = () => {
-    render(gl, rendering, scene);
+    render(gl, rendering, game);
 
     const viewingMove = [0, 0];
     if (input.KeyA) {
@@ -82,81 +95,29 @@ document.addEventListener('DOMContentLoaded', async () => {
   renderLoop();
 });
 
-function initRendering(gl) {
+function initRendering(gl, game) {
   const programs = createPrograms(gl);
 
   const bufferVaos = {};
 
-  { // cone
-    const vertices = twgl.primitives.createTruncatedConeVertices(1, 0, 2, 30, 30);
+  bufferVaos.cone = initBufferVao(gl, programs.main,
+    twgl.primitives.createTruncatedConeVertices(1, 0, 2, 32, 32),
+    [
+      ['ai_translate', 3, p => pieceCoordTranslation(p.coord)],
+      ['ai_diffuse', 4, pieceTeamDiffuse],
+    ],
+    game.pieces,
+  );
 
-    const vao = gl.createVertexArray();
-    gl.bindVertexArray(vao);
+  bufferVaos.torus = initBufferVao(gl, programs.main,
+    twgl.primitives.createTorusVertices(1.1, 0.1, 32, 32),
+    [
+      ['ai_translate', 3, pieceCoordTranslation],
+    ],
+    allPieceCorrds(),
+  );
 
-    [['normal', 3], ['position', 3], ['texcoord', 2]].forEach(([attr, size]) => {
-      const attribLocation = programs.main.attribSetters[`a_${attr}`].location;
-      gl.enableVertexAttribArray(attribLocation);
-
-      const buffer = gl.createBuffer();
-      gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-      gl.bufferData(gl.ARRAY_BUFFER, vertices[attr], gl.STATIC_DRAW);
-
-      gl.vertexAttribPointer( // point to latest bindBuffer
-        attribLocation,
-        size,
-        gl.FLOAT, // type
-        false, // normalize
-        0, // stride
-        0, // offset
-      );
-    })
-
-    { // ai_translate
-      const attribLocation = programs.main.attribSetters.ai_translate.location;
-      gl.enableVertexAttribArray(attribLocation);
-
-      const buffer = gl.createBuffer();
-      gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-        1, 0, 0, // instance [0]
-        -1, 0, 0, // instance [1]
-      ]), gl.STATIC_DRAW);
-
-      gl.vertexAttribPointer( // point to latest bindBuffer
-        attribLocation,
-        3,
-        gl.FLOAT, // type
-        false, // normalize
-        0, // stride
-        0, // offset
-      );
-
-      gl.vertexAttribDivisor(attribLocation, 1);
-    }
-
-    // using indices
-    const indicesBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indicesBuffer);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, vertices.indices, gl.STATIC_DRAW);
-
-    bufferVaos.cone = {
-      bufferInfo: {
-        numElements: vertices.indices.length,
-        indices: indicesBuffer,
-        elementType: gl.UNSIGNED_SHORT,
-        instance: 2,
-      }, vao,
-    };
-
-    // !!! important:
-    gl.bindVertexArray(null);
-
-    // using twgl without instance:
-    //const bufferInfo = twgl.createBufferInfoFromArrays(gl, vertices);
-    //const vao = twgl.createVAOFromBufferInfo(gl, programs.main, bufferInfo);
-  }
-
-  { // xyQuad
+  { // ground / xyQuad
     const vertices = twgl.primitives.createXYQuadVertices();
 
     const bufferInfo = twgl.createBufferInfoFromArrays(gl, vertices);
@@ -164,10 +125,71 @@ function initRendering(gl) {
     bufferVaos.xyQuad = { bufferInfo, vao };
   }
 
-
   return {
     programs, bufferVaos,
     lightProjection: createLightProjectionInfo(gl),
+  };
+}
+
+function initBufferVao(gl, program, vertices, instanceAttrs, instanceData) {
+  const vao = gl.createVertexArray();
+  gl.bindVertexArray(vao);
+
+  [['normal', 3], ['position', 3], ['texcoord', 2]].forEach(([attr, size]) => {
+    const attribLocation = program.attribSetters[`a_${attr}`].location;
+    gl.enableVertexAttribArray(attribLocation);
+
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, vertices[attr], gl.STATIC_DRAW);
+
+    gl.vertexAttribPointer( // point to latest bindBuffer
+      attribLocation,
+      size,
+      gl.FLOAT, // type
+      false, // normalize
+      0, // stride
+      0, // offset
+    );
+  });
+
+  instanceAttrs.forEach(([attr, size, getData]) => {
+    const attribLocation = program.attribSetters[attr].location;
+    gl.enableVertexAttribArray(attribLocation);
+
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+      ...instanceData.flatMap(getData),
+    ]), gl.STATIC_DRAW);
+
+    gl.vertexAttribPointer( // point to latest bindBuffer
+      attribLocation,
+      size,
+      gl.FLOAT, // type
+      false, // normalize
+      0, // stride
+      0, // offset
+    );
+
+    gl.vertexAttribDivisor(attribLocation, 1);
+  });
+
+  // using indices
+  const indicesBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indicesBuffer);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, vertices.indices, gl.STATIC_DRAW);
+
+  // !!! important:
+  gl.bindVertexArray(null);
+
+  return {
+    bufferInfo: {
+      numElements: vertices.indices.length,
+      indices: indicesBuffer,
+      elementType: gl.UNSIGNED_SHORT,
+      instance: instanceData.length,
+    }, vao,
   };
 }
 
@@ -205,13 +227,13 @@ function createLightProjectionInfo(gl) {
   };
 }
 
-function render(gl, rendering, scene) {
+function render(gl, rendering, game) {
   twgl.resizeCanvasToDisplaySize(gl.canvas, window.devicePixelRatio || 1);
 
   gl.enable(gl.CULL_FACE);
   gl.enable(gl.DEPTH_TEST);
 
-  const { lightProjectionTransform, occlusionBias, lightOcclusionSampleStepSize } = renderLightProjection(gl, rendering, scene);
+  const { lightProjectionTransform, occlusionBias, lightOcclusionSampleStepSize } = renderLightProjection(gl, rendering, game);
 
   twgl.bindFramebufferInfo(gl, null);
   gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
@@ -219,10 +241,10 @@ function render(gl, rendering, scene) {
   const projectionMatrix = matrix4.perspective(degToRad(45), gl.canvas.width / gl.canvas.height, 1, 2000);
   const cameraMatrix = pipe(
     matrix4.identity(),
-    m => matrix4.translate(m, ...scene.cameraViewing),
-    m => matrix4.yRotate(m, scene.cameraAngle[1]),
-    m => matrix4.xRotate(m, scene.cameraAngle[0]),
-    m => matrix4.translate(m, 0, 0, scene.cameraDistance),
+    m => matrix4.translate(m, ...game.cameraViewing),
+    m => matrix4.yRotate(m, game.cameraAngle[1]),
+    m => matrix4.xRotate(m, game.cameraAngle[0]),
+    m => matrix4.translate(m, 0, 0, game.cameraDistance),
   );
 
   const viewMatrix = matrix4.multiply(projectionMatrix, matrix4.inverse(cameraMatrix));
@@ -233,8 +255,8 @@ function render(gl, rendering, scene) {
     u_view: viewMatrix,
     u_cameraPosition: cameraMatrix.slice(12, 15),
     u_lightDir: matrix4.transformVector(matrix4.multiply(
-      matrix4.yRotation(scene.lightAngle[1]),
-      matrix4.xRotation(scene.lightAngle[0]),
+      matrix4.yRotation(game.lightAngle[1]),
+      matrix4.xRotation(game.lightAngle[0]),
     ), [0, -1, 0, 1]).slice(0, 3),
     u_ambientLight: [0, 0, 0],
     u_lightProjectionMap: rendering.lightProjection.map,
@@ -247,7 +269,28 @@ function render(gl, rendering, scene) {
 }
 
 function renderObjects(gl, rendering, programInfo) {
-  { // draw one cone
+
+  { // draw torus
+    twgl.setUniforms(programInfo, {
+      u_world: matrix4.identity(),
+      u_worldInverseTranspose: matrix4.transpose(matrix4.inverse(matrix4.identity())),
+      u_diffuse: [1, 1, 1, 1],
+      u_ambient: [0, 0, 0],
+      u_emissive: [0, 0, 0],
+      u_specular: [1, 1, 1],
+      u_shininess: 20000,
+    });
+    gl.bindVertexArray(rendering.bufferVaos.torus.vao);
+    gl.drawElementsInstanced(
+      gl.TRIANGLES,
+      rendering.bufferVaos.torus.bufferInfo.numElements,
+      rendering.bufferVaos.torus.bufferInfo.elementType,
+      0, // offset
+      rendering.bufferVaos.torus.bufferInfo.instance,
+    );
+  }
+
+  { // draw pieces / cones
     const worldMatrix = pipe(
       matrix4.identity(),
       m => matrix4.translate(m, 0, 1, 0),
@@ -256,7 +299,7 @@ function renderObjects(gl, rendering, programInfo) {
     twgl.setUniforms(programInfo, {
       u_world: worldMatrix,
       u_worldInverseTranspose: matrix4.transpose(matrix4.inverse(worldMatrix)),
-      u_diffuse: [107/255, 222/255, 153/255, 1],
+      u_diffuse: [0, 0, 0, 0],
       u_ambient: [0, 0, 0],
       u_emissive: [0, 0, 0],
       u_specular: [1, 1, 1],
@@ -270,11 +313,9 @@ function renderObjects(gl, rendering, programInfo) {
       0, // offset
       rendering.bufferVaos.cone.bufferInfo.instance,
     );
-    //gl.drawArraysInstanced(gl.TRIANGLES, 0, rendering.bufferVaos.cone.bufferInfo.numElements, 2);
-    //twgl.drawBufferInfo(gl, rendering.bufferVaos.cone.bufferInfo);
   }
 
-  { // draw ground
+  { // draw ground / xyQuad
     const worldMatrix = pipe(
       matrix4.identity(),
       m => matrix4.scale(m, 1000, 1, 1000),
@@ -284,7 +325,7 @@ function renderObjects(gl, rendering, programInfo) {
     twgl.setUniforms(programInfo, {
       u_world: worldMatrix,
       u_worldInverseTranspose: matrix4.transpose(matrix4.inverse(worldMatrix)),
-      u_diffuse: [107/255, 222/255, 198/255, 1],
+      u_diffuse: [107/255, 222/255, 153/255, 1],
       u_ambient: [0, 0, 0],
       u_emissive: [0, 0, 0],
       u_specular: [1, 1, 1],
@@ -295,7 +336,7 @@ function renderObjects(gl, rendering, programInfo) {
   }
 }
 
-function renderLightProjection(gl, rendering, scene) {
+function renderLightProjection(gl, rendering, game) {
   twgl.bindFramebufferInfo(gl, rendering.lightProjection.framebufferInfo);
 
   // debug:
@@ -306,20 +347,20 @@ function renderLightProjection(gl, rendering, scene) {
 
   const lightProjectionTransform = pipe(
     [ // like orthogonal, but without translation
-      1 / scene.maxCoord[0], 0, 0, 0,
-      0, -1 / scene.maxCoord[1], 0, 0,
-      0, 0, 1 / scene.maxCoord[2], 0,
+      1 / game.maxCoord[0], 0, 0, 0,
+      0, -1 / game.maxCoord[1], 0, 0,
+      0, 0, 1 / game.maxCoord[2], 0,
       0, 0, 0, 1,
     ],
     m => matrix4.multiply(m, [ // sheering
       1, 0, 0, 0,
       0, 1, 0, 0,
-      0, Math.tan(scene.lightAngle[0]), 1, 0,
+      0, Math.tan(game.lightAngle[0]), 1, 0,
       0, 0, 0, 1,
     ]),
     m => matrix4.multiply(m, matrix4.inverse(
       matrix4.multiply(
-        matrix4.yRotation(scene.lightAngle[1]),
+        matrix4.yRotation(game.lightAngle[1]),
         matrix4.xRotation(degToRad(90)),
       )
     ))
@@ -335,7 +376,54 @@ function renderLightProjection(gl, rendering, scene) {
 
   return {
     lightProjectionTransform,
-    occlusionBias: 0.5 * Math.cos(scene.lightAngle[0]) / scene.maxCoord[2],
-    lightOcclusionSampleStepSize: scene.maxCoord.slice(0, 2).map(s => 0.025 / s),
+    occlusionBias: 0.5 * Math.cos(game.lightAngle[0]) / game.maxCoord[2],
+    lightOcclusionSampleStepSize: game.maxCoord.slice(0, 2).map(s => 0.025 / s),
   };
+}
+
+function pieceCoordTranslation(coord) {
+  return [coord[0] * 3 - coord[1] * 1.5, 0, coord[1] * -2.5];
+}
+const pieceTeamDiffuseMap = {
+  y: [215/255, 147/255, 57/255, 1],
+  g: [57/255, 215/255, 94/255, 1],
+  b: [57/255, 132/255, 215/255, 1],
+};
+function pieceTeamDiffuse({ team }) {
+  return pieceTeamDiffuseMap[team];
+}
+
+function allPieceCorrds() {
+  return [
+    // main pieces:
+    ...Array(9).fill().flatMap((_, i) => (
+      Array(9).fill().map((_, j) => (
+        [i - 4, j - 4]
+      ))
+    )),
+    // left down pieces
+    ...Array(4).fill().flatMap((_, i) => (
+      Array(i+1).fill().map((_, j) => (
+        [i - 8, j - 4]
+      ))
+    )),
+    // top pieces
+    ...Array(4).fill().flatMap((_, i) => (
+      Array(i+1).fill().map((_, j) => (
+        [i + 1, j + 5]
+      ))
+    )),
+    // right upper pieces
+    ...Array(4).fill().flatMap((_, i) => (
+      Array(i+1).fill().map((_, j) => (
+        [j + 5, i + 1]
+      ))
+    )),
+    // bottom pieces
+    ...Array(4).fill().flatMap((_, i) => (
+      Array(i+1).fill().map((_, j) => (
+        [j - 4, i - 8]
+      ))
+    )),
+  ];
 }
