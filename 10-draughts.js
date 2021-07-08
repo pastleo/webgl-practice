@@ -1,12 +1,18 @@
 import * as twgl from './vendor/twgl-full.module.js';
 
 import listenToInputs from './lib/10-draughts/input.js';
-import createPrograms from './lib/10-draughts/shaders.js';
+import createPrograms, { attribLocations } from './lib/10-draughts/shaders.js';
 
 import { matrix4 } from './lib/matrix.js';
 import { pipe, degToRad } from './lib/utils.js';
 
 import devModePromise from './lib/dev.js';
+
+const pieceTeamDiffuseMap = {
+  y: [215/255, 147/255, 57/255, 1],
+  g: [57/255, 215/255, 94/255, 1],
+  b: [57/255, 132/255, 215/255, 1],
+};
 
 document.addEventListener('DOMContentLoaded', async () => {
   await devModePromise;
@@ -49,30 +55,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   twgl.setAttributePrefix('a_');
 
   const game = {
-    cameraAngle: [degToRad(-20), 0],
-    cameraViewing: [0, 0, 0],
-    cameraDistance: 10,
+    cameraAngle: [degToRad(-40), 0],
+    cameraViewing: [0, 0, 6],
+    cameraDistance: 50,
     lightAngle: [degToRad(45), degToRad(30)],
     maxCoord: [25, 25, 4],
+    pointing: null,
 
-    pieces: [
-      { coord: [0, 0], team: 'y' },
-      { coord: [1, 0], team: 'y' },
-      { coord: [0, -1], team: 'b' },
-      { coord: [-1, -1], team: 'g' },
-      { coord: [-1, 0], team: 'y' },
-      { coord: [0, 1], team: 'y' },
-      { coord: [1, 1], team: 'y' },
-
-
-      { coord: [0, -2], team: 'b' },
-    ],
+    pieces: initPieces(),
   }
+  window.game = game;
 
   const input = listenToInputs(canvas, game);
   const rendering = initRendering(gl, game);
 
-  console.log(rendering);
+  console.log(game, rendering);
 
   const renderLoop = () => {
     render(gl, rendering, game);
@@ -100,16 +97,17 @@ function initRendering(gl, game) {
 
   const bufferVaos = {};
 
-  bufferVaos.cone = initBufferVao(gl, programs.main,
+  bufferVaos.cone = initInstancedBufferVao(gl, programs.main,
     twgl.primitives.createTruncatedConeVertices(1, 0, 2, 32, 32),
     [
       ['ai_translate', 3, p => pieceCoordTranslation(p.coord)],
-      ['ai_diffuse', 4, pieceTeamDiffuse],
+      ['ai_diffuse', 4, p => pieceTeamDiffuseMap[p.team]],
+      ['ai_objectId', 4, p => encodeIntVec4(p.i)],
     ],
     game.pieces,
   );
 
-  bufferVaos.torus = initBufferVao(gl, programs.main,
+  bufferVaos.torus = initInstancedBufferVao(gl, programs.main,
     twgl.primitives.createTorusVertices(1.1, 0.1, 32, 32),
     [
       ['ai_translate', 3, pieceCoordTranslation],
@@ -128,15 +126,19 @@ function initRendering(gl, game) {
   return {
     programs, bufferVaos,
     lightProjection: createLightProjectionInfo(gl),
+    objectIdProjection: createObjectIdProjectionInfo(gl),
   };
 }
 
-function initBufferVao(gl, program, vertices, instanceAttrs, instanceData) {
+function initInstancedBufferVao(gl, program, vertices, instanceAttrs, instanceData) {
   const vao = gl.createVertexArray();
   gl.bindVertexArray(vao);
 
   [['normal', 3], ['position', 3], ['texcoord', 2]].forEach(([attr, size]) => {
-    const attribLocation = program.attribSetters[`a_${attr}`].location;
+    const attribSetter = program.attribSetters[`a_${attr}`];
+    const attribLocation = attribSetter ? attribSetter.location : attribLocations[`a_${attr}`];
+    if (!attribSetter) return;
+
     gl.enableVertexAttribArray(attribLocation);
 
     const buffer = gl.createBuffer();
@@ -153,20 +155,23 @@ function initBufferVao(gl, program, vertices, instanceAttrs, instanceData) {
     );
   });
 
-  instanceAttrs.forEach(([attr, size, getData]) => {
-    const attribLocation = program.attribSetters[attr].location;
+  instanceAttrs.forEach(([attr, size, getData, type]) => {
+    const attribSetter = program.attribSetters[attr];
+    const attribLocation = attribSetter ? attribSetter.location : attribLocations[attr];
+    if (!attribLocation) return;
+
     gl.enableVertexAttribArray(attribLocation);
+
+    const data = new Float32Array(instanceData.flatMap(getData));
 
     const buffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-      ...instanceData.flatMap(getData),
-    ]), gl.STATIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
 
     gl.vertexAttribPointer( // point to latest bindBuffer
       attribLocation,
       size,
-      gl.FLOAT, // type
+      type || gl.FLOAT, // type
       false, // normalize
       0, // stride
       0, // offset
@@ -227,6 +232,18 @@ function createLightProjectionInfo(gl) {
   };
 }
 
+function createObjectIdProjectionInfo(gl) {
+  const width = 1;
+  const height = 1;
+
+  const framebufferInfo = twgl.createFramebufferInfo(gl, null, width, height)
+
+  return {
+    framebufferInfo,
+    map: framebufferInfo.attachments[0],
+  };
+}
+
 function render(gl, rendering, game) {
   twgl.resizeCanvasToDisplaySize(gl.canvas, window.devicePixelRatio || 1);
 
@@ -234,9 +251,6 @@ function render(gl, rendering, game) {
   gl.enable(gl.DEPTH_TEST);
 
   const { lightProjectionTransform, occlusionBias, lightOcclusionSampleStepSize } = renderLightProjection(gl, rendering, game);
-
-  twgl.bindFramebufferInfo(gl, null);
-  gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 
   const projectionMatrix = matrix4.perspective(degToRad(45), gl.canvas.width / gl.canvas.height, 1, 2000);
   const cameraMatrix = pipe(
@@ -248,7 +262,10 @@ function render(gl, rendering, game) {
   );
 
   const viewMatrix = matrix4.multiply(projectionMatrix, matrix4.inverse(cameraMatrix));
-  
+
+  renderObjectIdProjection(gl, rendering, game, viewMatrix);
+
+  gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
   gl.useProgram(rendering.programs.main.program);
 
   twgl.setUniforms(rendering.programs.main, {
@@ -266,30 +283,10 @@ function render(gl, rendering, game) {
   });
 
   renderObjects(gl, rendering, rendering.programs.main);
+  renderBackground(gl, rendering, rendering.programs.main);
 }
 
 function renderObjects(gl, rendering, programInfo) {
-
-  { // draw torus
-    twgl.setUniforms(programInfo, {
-      u_world: matrix4.identity(),
-      u_worldInverseTranspose: matrix4.transpose(matrix4.inverse(matrix4.identity())),
-      u_diffuse: [1, 1, 1, 1],
-      u_ambient: [0, 0, 0],
-      u_emissive: [0, 0, 0],
-      u_specular: [1, 1, 1],
-      u_shininess: 20000,
-    });
-    gl.bindVertexArray(rendering.bufferVaos.torus.vao);
-    gl.drawElementsInstanced(
-      gl.TRIANGLES,
-      rendering.bufferVaos.torus.bufferInfo.numElements,
-      rendering.bufferVaos.torus.bufferInfo.elementType,
-      0, // offset
-      rendering.bufferVaos.torus.bufferInfo.instance,
-    );
-  }
-
   { // draw pieces / cones
     const worldMatrix = pipe(
       matrix4.identity(),
@@ -314,6 +311,28 @@ function renderObjects(gl, rendering, programInfo) {
       rendering.bufferVaos.cone.bufferInfo.instance,
     );
   }
+}
+
+function renderBackground(gl, rendering, programInfo) {
+  { // draw torus
+    twgl.setUniforms(programInfo, {
+      u_world: matrix4.identity(),
+      u_worldInverseTranspose: matrix4.transpose(matrix4.inverse(matrix4.identity())),
+      u_diffuse: [1, 1, 1, 1],
+      u_ambient: [0, 0, 0],
+      u_emissive: [0, 0, 0],
+      u_specular: [1, 1, 1],
+      u_shininess: 20000,
+    });
+    gl.bindVertexArray(rendering.bufferVaos.torus.vao);
+    gl.drawElementsInstanced(
+      gl.TRIANGLES,
+      rendering.bufferVaos.torus.bufferInfo.numElements,
+      rendering.bufferVaos.torus.bufferInfo.elementType,
+      0, // offset
+      rendering.bufferVaos.torus.bufferInfo.instance,
+    );
+  }
 
   { // draw ground / xyQuad
     const worldMatrix = pipe(
@@ -335,6 +354,7 @@ function renderObjects(gl, rendering, programInfo) {
     twgl.drawBufferInfo(gl, rendering.bufferVaos.xyQuad.bufferInfo);
   }
 }
+
 
 function renderLightProjection(gl, rendering, game) {
   twgl.bindFramebufferInfo(gl, rendering.lightProjection.framebufferInfo);
@@ -373,6 +393,8 @@ function renderLightProjection(gl, rendering, game) {
   });
 
   renderObjects(gl, rendering, rendering.programs.depth);
+  renderBackground(gl, rendering, rendering.programs.depth);
+  twgl.bindFramebufferInfo(gl, null);
 
   return {
     lightProjectionTransform,
@@ -381,16 +403,45 @@ function renderLightProjection(gl, rendering, game) {
   };
 }
 
+function renderObjectIdProjection(gl, rendering, game, viewMatrix) {
+  if (!game.pointing) return;
+
+  twgl.bindFramebufferInfo(gl, rendering.objectIdProjection.framebufferInfo);
+
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+  const objectIdProjectionTransform = pipe(
+    matrix4.identity(),
+    m => matrix4.scale(m, gl.canvas.width, gl.canvas.height, 1),
+    m => matrix4.translate(m,
+      (2 / gl.canvas.width) * (gl.canvas.width / 2 - game.pointing[0]),
+      (2 / gl.canvas.height) * (game.pointing[1] - gl.canvas.height / 2),
+      0,
+    ),
+    m => matrix4.multiply(m, viewMatrix),
+  );
+
+  gl.useProgram(rendering.programs.objId.program);
+
+  twgl.setUniforms(rendering.programs.objId, {
+    u_view: objectIdProjectionTransform,
+  });
+
+  renderObjects(gl, rendering, rendering.programs.objId);
+
+  const pixelData = new Uint8Array(4);
+  gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixelData);
+
+  game.pointingObjectId = decodeVec4Int(pixelData);
+  if (game.pointingObjectId) {
+    console.log(game.pointingObjectId);
+  }
+
+  twgl.bindFramebufferInfo(gl, null);
+}
+
 function pieceCoordTranslation(coord) {
   return [coord[0] * 3 - coord[1] * 1.5, 0, coord[1] * -2.5];
-}
-const pieceTeamDiffuseMap = {
-  y: [215/255, 147/255, 57/255, 1],
-  g: [57/255, 215/255, 94/255, 1],
-  b: [57/255, 132/255, 215/255, 1],
-};
-function pieceTeamDiffuse({ team }) {
-  return pieceTeamDiffuseMap[team];
 }
 
 function allPieceCorrds() {
@@ -426,4 +477,46 @@ function allPieceCorrds() {
       ))
     )),
   ];
+}
+
+function initPieces() {
+  return [
+    // team y
+    ...Array(4).fill().flatMap((_, i) => (
+      Array(i+1).fill().map((_, j) => (
+        { coord: [i - 8, j - 4], team: 'y' }
+      ))
+    )),
+
+    // team b
+    ...Array(4).fill().flatMap((_, i) => (
+      Array(i+1).fill().map((_, j) => (
+        { coord: [i + 1, j + 5], team: 'b' }
+      ))
+    )),
+
+    // team g
+    ...Array(4).fill().flatMap((_, i) => (
+      Array(i+1).fill().map((_, j) => (
+        { coord: [i + 1, j - 4], team: 'g' }
+      ))
+    )),
+  ].map((piece, i) => ({
+    ...piece, i: i + 1
+  }));
+}
+
+function encodeIntVec4(i) {
+  return [
+    ((i >>  0) & 0xFF) / 0xFF,
+    ((i >>  8) & 0xFF) / 0xFF,
+    ((i >> 16) & 0xFF) / 0xFF,
+    ((i >> 24) & 0xFF) / 0xFF,
+  ]
+}
+function decodeVec4Int(vec) {
+  return (
+    (vec[0] << 0) + (vec[1] << 8) +
+    (vec[2] << 16) + (vec[3] << 24)
+  );
 }
