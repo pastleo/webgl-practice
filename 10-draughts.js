@@ -53,5 +53,3 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   requestAnimationFrame(renderLoop);
 });
-
-
