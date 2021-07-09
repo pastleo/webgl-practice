@@ -45,13 +45,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.game = game;
   console.log(game);
 
-  const renderLoop = () => {
+  const renderLoop = time => {
     updateGame(game);
-    render(game);
+    render(game, time);
 
     requestAnimationFrame(renderLoop);
   }
-  renderLoop();
+  requestAnimationFrame(renderLoop);
 });
 
 
