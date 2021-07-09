@@ -1,13 +1,5 @@
-import * as twgl from './vendor/twgl-full.module.js';
-
-import initRendering from './lib/10-draughts/init-rendering.js';
-import listenToInputs from './lib/10-draughts/input.js';
-
+import initGame, { updateGame } from './lib/10-draughts/game.js';
 import render from './lib/10-draughts/render.js';
-
-import { degToRad } from './lib/utils.js';
-
-import { initPieces } from './lib/10-draughts/utils.js';
 
 import devModePromise from './lib/dev.js';
 
@@ -20,7 +12,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     alert('Your browser does not support WebGL')
     return;
   }
-  window.gl = gl;
+  //window.gl = gl;
 
   const oesVaoExt = gl.getExtension('OES_vertex_array_object');
   if (oesVaoExt) {
@@ -49,43 +41,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     return;
   }
 
-  twgl.setAttributePrefix('a_');
-
-  const game = {
-    fieldOfView: degToRad(45),
-    cameraAngle: [degToRad(-40), 0],
-    cameraViewing: [0, 0, 0],
-    cameraDistance: 50,
-    lightAngle: [degToRad(45), degToRad(30)],
-    maxCoord: [25, 25, 4],
-
-    pieces: initPieces(),
-  }
+  const game = initGame(gl);
   window.game = game;
-
-  const rendering = initRendering(gl, game);
-  game.rendering = rendering;
-
-  const input = listenToInputs(canvas, game);
-  game.input = input;
-
   console.log(game);
 
   const renderLoop = () => {
-    render(gl, game);
-
-    const viewingMove = [0, 0];
-    if (input.KeyA) {
-      viewingMove[0] -= 0.1;
-    } else if (input.KeyD) {
-      viewingMove[0] += 0.1;
-    }
-    if (input.KeyW) {
-      viewingMove[1] -= 0.1;
-    } else if (input.KeyS) {
-      viewingMove[1] += 0.1;
-    }
-    input.moveViewing(viewingMove);
+    updateGame(game);
+    render(game);
 
     requestAnimationFrame(renderLoop);
   }
