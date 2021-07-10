@@ -3,7 +3,7 @@ import render from './lib/10-draughts/render.js';
 
 import devModePromise from './lib/dev.js';
 
-document.addEventListener('DOMContentLoaded', async () => {
+async function main() {
   await devModePromise;
 
   const canvas = document.getElementById('main');
@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     alert('Your browser does not support WebGL')
     return;
   }
-  //window.gl = gl;
+  window.gl = gl;
 
   const oesVaoExt = gl.getExtension('OES_vertex_array_object');
   if (oesVaoExt) {
@@ -52,4 +52,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     requestAnimationFrame(renderLoop);
   }
   requestAnimationFrame(renderLoop);
-});
+};
+
+main();
