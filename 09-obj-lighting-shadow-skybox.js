@@ -293,7 +293,7 @@ void main() {
   v_surfaceToLight = u_worldLightPosition - worldPosition.xyz;
   v_surfaceToViewer = u_worldViewerPosition - worldPosition.xyz;
   v_lightProjection = u_lightProjectionMatrix * worldPosition;
-	v_worldPosition = worldPosition.xyz;
+  v_worldPosition = worldPosition.xyz;
 }
 `;
 
