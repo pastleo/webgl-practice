@@ -7,7 +7,9 @@ async function main() {
   await devModePromise;
 
   const canvas = document.getElementById('main');
-  const gl = canvas.getContext('webgl');
+  const gl = canvas.getContext('webgl', {
+    alpha: false,
+  });
   if (!gl) {
     alert('Your browser does not support WebGL')
     return;
