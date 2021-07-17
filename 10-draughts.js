@@ -1,4 +1,4 @@
-import initGame, { updateGame } from './lib/10-draughts/game.js';
+import initGame, { updateGame, startGame, resetGame } from './lib/10-draughts/game.js';
 import render from './lib/10-draughts/render.js';
 
 import devModePromise from './lib/dev.js';
@@ -46,6 +46,54 @@ async function main() {
   const game = initGame(gl);
   window.game = game;
   console.log(game);
+
+  const uiUpperDOM = document.querySelector('.ui-upper');
+  const uiMainDOM = document.querySelector('.ui-main');
+  const uiBottomDOM = document.querySelector('.ui-bottom');
+
+  document.getElementById('start-game').addEventListener('click', () => {
+    const gameOptionForm = new FormData(document.getElementById('game-option'));
+
+    uiUpperDOM.classList.add('opacity-0');
+    uiMainDOM.classList.add('opacity-0');
+    uiBottomDOM.classList.remove('hidden');
+    setTimeout(() => {
+      uiUpperDOM.classList.add('hidden');
+      uiMainDOM.classList.add('hidden');
+      uiBottomDOM.classList.remove('opacity-0');
+    }, 1200);
+
+    startGame(game, {
+      turnSecs: parseInt(gameOptionForm.get('turn-secs'))
+    });
+  });
+  document.getElementById('reset-game').addEventListener('click', () => {
+    uiUpperDOM.classList.remove('hidden');
+    uiMainDOM.classList.remove('hidden');
+    uiBottomDOM.classList.add('opacity-0');
+
+    setTimeout(() => {
+      uiUpperDOM.classList.remove('opacity-0');
+      uiMainDOM.classList.remove('opacity-0');
+      uiBottomDOM.classList.add('hidden');
+    }, 1200);
+
+    resetGame(game);
+  });
+  const disableUI = () => {
+    uiUpperDOM.style.pointerEvents = 'none';
+    uiMainDOM.style.pointerEvents = 'none';
+    uiBottomDOM.style.pointerEvents = 'none';
+  }
+  const enableUI = () => {
+    uiUpperDOM.style.pointerEvents = '';
+    uiMainDOM.style.pointerEvents = '';
+    uiBottomDOM.style.pointerEvents = '';
+  }
+  canvas.addEventListener('mousedown', disableUI);
+  canvas.addEventListener('touchstart', disableUI);
+  canvas.addEventListener('touchend', enableUI);
+  canvas.addEventListener('mouseup', enableUI);
 
   const renderLoop = time => {
     updateGame(game);
