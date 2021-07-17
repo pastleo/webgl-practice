@@ -51,7 +51,12 @@ async function main() {
   const uiMainDOM = document.querySelector('.ui-main');
   const uiBottomDOM = document.querySelector('.ui-bottom');
 
+  let gameStarted = false;
+
   document.getElementById('start-game').addEventListener('click', () => {
+    if (gameStarted) return;
+    gameStarted = true;
+
     const gameOptionForm = new FormData(document.getElementById('game-option'));
 
     uiUpperDOM.classList.add('opacity-0');
@@ -68,6 +73,9 @@ async function main() {
     });
   });
   document.getElementById('reset-game').addEventListener('click', () => {
+    if (!gameStarted) return;
+    gameStarted = false;
+
     uiUpperDOM.classList.remove('hidden');
     uiMainDOM.classList.remove('hidden');
     uiBottomDOM.classList.add('opacity-0');

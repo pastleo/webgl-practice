@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>10-draughts</title>
+  <title>跳棋 - WebGL 10 號練習</title>
   <meta key='description' name='Description' content='My webgl practice - 10-draughts'>
   <meta key='viewport' name='viewport' content='width=device-width, initial-scale=1'>
-  <meta key='og:image' name='og:image' content=''>
+  <meta key='og:image' name='og:image' content='https://i.imgur.com/zKbyfs3h.png'>
   <style>
     html, body {
       height: 100%;
@@ -65,8 +65,8 @@
         <form id="game-option" class="my-2 flex flex-wrap">
           <input class="hidden" type="radio" id="turn-secs0" name="turn-secs" value="0" checked>
           <label class="flex-1 min-w-min rounded p-2" for="turn-secs0">無限制</label>
-          <input class="hidden" type="radio" id="turn-secs3" name="turn-secs" value="3">
-          <label class="flex-1 min-w-min rounded p-2" for="turn-secs3">3 秒</label>
+          <input class="hidden" type="radio" id="turn-secs5" name="turn-secs" value="5">
+          <label class="flex-1 min-w-min rounded p-2" for="turn-secs5">5 秒</label>
           <input class="hidden" type="radio" id="turn-secs10" name="turn-secs" value="10">
           <label class="flex-1 min-w-min rounded p-2" for="turn-secs10">10 秒</label>
           <input class="hidden" type="radio" id="turn-secs20" name="turn-secs" value="20">
@@ -92,7 +92,7 @@
 
   <div class="ui-bottom fixed text-white transition-opacity opacity-0 hidden">
     <div class="p-4">
-      <button id="reset-game" class="border border-white rounded p-2 bg-transparent text-white hover:bg-white hover:text-black">重設遊戲</button>
+      <button id="reset-game" class="border border-white rounded p-2 bg-transparent text-white hover:bg-white hover:text-black">重設</button>
     </div>
   </div>
 
