@@ -24,20 +24,20 @@ const sceneData = {
     shadowSampleStepSize: 0.001,
   },
   skybox: {
-    srcset: {
-      //TEXTURE_CUBE_MAP_POSITIVE_X: 'assets/skybox/tropical-sunny-sky-px.jpg',
-      //TEXTURE_CUBE_MAP_NEGATIVE_X: 'assets/skybox/tropical-sunny-sky-nx.jpg',
-      //TEXTURE_CUBE_MAP_POSITIVE_Y: 'assets/skybox/tropical-sunny-sky-py.jpg',
-      //TEXTURE_CUBE_MAP_NEGATIVE_Y: 'assets/skybox/tropical-sunny-sky-ny.jpg',
-      //TEXTURE_CUBE_MAP_POSITIVE_Z: 'assets/skybox/tropical-sunny-sky-pz.jpg',
-      //TEXTURE_CUBE_MAP_NEGATIVE_Z: 'assets/skybox/tropical-sunny-sky-nz.jpg',
-
-      TEXTURE_CUBE_MAP_POSITIVE_X: 'assets/skybox/sunset-px.webp',
-      TEXTURE_CUBE_MAP_NEGATIVE_X: 'assets/skybox/sunset-nx.webp',
-      TEXTURE_CUBE_MAP_POSITIVE_Y: 'assets/skybox/sunset-py.webp',
-      TEXTURE_CUBE_MAP_NEGATIVE_Y: 'assets/skybox/sunset-ny.webp',
-      TEXTURE_CUBE_MAP_POSITIVE_Z: 'assets/skybox/sunset-pz.webp',
-      TEXTURE_CUBE_MAP_NEGATIVE_Z: 'assets/skybox/sunset-nz.webp',
+    srcset: supportWebp() ? {
+      TEXTURE_CUBE_MAP_POSITIVE_X: 'assets/skybox/tropical-sunny-sky-px.webp',
+      TEXTURE_CUBE_MAP_NEGATIVE_X: 'assets/skybox/tropical-sunny-sky-nx.webp',
+      TEXTURE_CUBE_MAP_POSITIVE_Y: 'assets/skybox/tropical-sunny-sky-py.webp',
+      TEXTURE_CUBE_MAP_NEGATIVE_Y: 'assets/skybox/tropical-sunny-sky-ny.webp',
+      TEXTURE_CUBE_MAP_POSITIVE_Z: 'assets/skybox/tropical-sunny-sky-pz.webp',
+      TEXTURE_CUBE_MAP_NEGATIVE_Z: 'assets/skybox/tropical-sunny-sky-nz.webp',
+    } : {
+      TEXTURE_CUBE_MAP_POSITIVE_X: 'assets/skybox/sunset-px.jpg',
+      TEXTURE_CUBE_MAP_NEGATIVE_X: 'assets/skybox/sunset-nx.jpg',
+      TEXTURE_CUBE_MAP_POSITIVE_Y: 'assets/skybox/sunset-py.jpg',
+      TEXTURE_CUBE_MAP_NEGATIVE_Y: 'assets/skybox/sunset-ny.jpg',
+      TEXTURE_CUBE_MAP_POSITIVE_Z: 'assets/skybox/sunset-pz.jpg',
+      TEXTURE_CUBE_MAP_NEGATIVE_Z: 'assets/skybox/sunset-nz.jpg',
     },
   },
   objects: [
@@ -833,7 +833,7 @@ function renderObject(gl, {
     ...parentUniforms,
     ...uniforms,
   }
-  const programInfoToUse = globals.lightProjectionProgramInfo ?? programInfo;
+  const programInfoToUse = globals.lightProjectionProgramInfo || programInfo;
 
   if (!hidden && programInfo && vao && bufferInfo) {
     gl.useProgram(programInfoToUse.program);
@@ -904,4 +904,16 @@ function randomDiffColor(baseColor) {
 }
 function randomColor() {
   return [Math.random(), Math.random(), Math.random()]
+}
+
+// https://stackoverflow.com/a/27232658
+function supportWebp() {
+  const tmpCanvas = document.createElement('canvas');
+
+  if (!!(tmpCanvas.getContext && tmpCanvas.getContext('2d'))) {
+    return tmpCanvas.toDataURL('image/webp').indexOf('data:image/webp') == 0;
+  } else {
+    // very old browser like IE 8, canvas not supported
+    return false;
+  }
 }
