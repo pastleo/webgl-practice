@@ -1,5 +1,5 @@
-import initGame, { updateGame, startGame, resetGame } from './lib/10-draughts/game.js';
-import render from './lib/10-draughts/render.js';
+import initGame, { updateGame, startGame, resetGame } from './lib/10-diamond-chinese-checkers/game.js';
+import render from './lib/10-diamond-chinese-checkers/render.js';
 
 import devModePromise from './lib/dev.js';
 
