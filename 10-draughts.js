@@ -53,11 +53,17 @@ async function main() {
 
   let gameStarted = false;
 
+  const gameOptionForm = document.getElementById('game-option');
+  if (window.devicePixelRatio > 1) {
+    document.getElementById('pixel-ratio-high').value = window.devicePixelRatio;
+    document.querySelector('label[for=pixel-ratio-high]').classList.remove('hidden');
+  }
+  gameOptionForm.addEventListener('change', () => {
+    game.pixelRatio = parseFloat(new FormData(gameOptionForm).get('pixel-ratio'))
+  });
   document.getElementById('start-game').addEventListener('click', () => {
     if (gameStarted) return;
     gameStarted = true;
-
-    const gameOptionForm = new FormData(document.getElementById('game-option'));
 
     uiUpperDOM.classList.add('opacity-0');
     uiMainDOM.classList.add('opacity-0');
@@ -69,7 +75,7 @@ async function main() {
     }, 1200);
 
     startGame(game, {
-      turnSecs: parseInt(gameOptionForm.get('turn-secs'))
+      turnSecs: parseInt(new FormData(gameOptionForm).get('turn-secs')),
     });
   });
   document.getElementById('reset-game').addEventListener('click', () => {

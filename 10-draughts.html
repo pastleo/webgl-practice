@@ -40,6 +40,7 @@
     .mx-4 { margin-left: 1rem; margin-right: 1rem; }
     .my-2 { margin-top: 0.5rem; margin-bottom: 0.5rem; }
     .text-center { text-align: center; }
+    .text-xs { font-size: 0.75rem; }
     .font-2xl { font-size: 1.5rem; }
     .hidden { display: none; }
     .flex { display: flex; }
@@ -61,22 +62,33 @@
   <div class="ui-upper fixed text-white transition-opacity">
     <div class="max-w-screen-sm mx-auto">
       <div class="border border-white rounded mx-4 p-2 px-4 text-center">
-        <p class="my-2">每回合時間限制</p>
-        <form id="game-option" class="my-2 flex flex-wrap">
-          <input class="hidden" type="radio" id="turn-secs0" name="turn-secs" value="0" checked>
-          <label class="flex-1 min-w-min rounded p-2" for="turn-secs0">無限制</label>
-          <input class="hidden" type="radio" id="turn-secs5" name="turn-secs" value="5">
-          <label class="flex-1 min-w-min rounded p-2" for="turn-secs5">5 秒</label>
-          <input class="hidden" type="radio" id="turn-secs10" name="turn-secs" value="10">
-          <label class="flex-1 min-w-min rounded p-2" for="turn-secs10">10 秒</label>
-          <input class="hidden" type="radio" id="turn-secs20" name="turn-secs" value="20">
-          <label class="flex-1 min-w-min rounded p-2" for="turn-secs20">20 秒</label>
-          <input class="hidden" type="radio" id="turn-secs30" name="turn-secs" value="30">
-          <label class="flex-1 min-w-min rounded p-2" for="turn-secs30">30 秒</label>
-          <input class="hidden" type="radio" id="turn-secs60" name="turn-secs" value="60">
-          <label class="flex-1 min-w-min rounded p-2" for="turn-secs60">1 分鐘</label>
-          <input class="hidden" type="radio" id="turn-secs120" name="turn-secs" value="120">
-          <label class="flex-1 min-w-min rounded p-2" for="turn-secs120">2 分鐘</label>
+        <form id="game-option">
+          <p class="my-2">每回合時間限制</p>
+          <div class="my-2 flex flex-wrap">
+            <input class="hidden" type="radio" id="turn-secs0" name="turn-secs" value="0" checked>
+            <label class="flex-1 min-w-min rounded p-2" for="turn-secs0">無限制</label>
+            <input class="hidden" type="radio" id="turn-secs5" name="turn-secs" value="5">
+            <label class="flex-1 min-w-min rounded p-2" for="turn-secs5">5 秒</label>
+            <input class="hidden" type="radio" id="turn-secs10" name="turn-secs" value="10">
+            <label class="flex-1 min-w-min rounded p-2" for="turn-secs10">10 秒</label>
+            <input class="hidden" type="radio" id="turn-secs20" name="turn-secs" value="20">
+            <label class="flex-1 min-w-min rounded p-2" for="turn-secs20">20 秒</label>
+            <input class="hidden" type="radio" id="turn-secs30" name="turn-secs" value="30">
+            <label class="flex-1 min-w-min rounded p-2" for="turn-secs30">30 秒</label>
+            <input class="hidden" type="radio" id="turn-secs60" name="turn-secs" value="60">
+            <label class="flex-1 min-w-min rounded p-2" for="turn-secs60">1 分鐘</label>
+            <input class="hidden" type="radio" id="turn-secs120" name="turn-secs" value="120">
+            <label class="flex-1 min-w-min rounded p-2" for="turn-secs120">2 分鐘</label>
+          </div>
+          <div class="my-2 text-xs flex flex-wrap">
+            <p class="flex-1 my-2">解析度</p>
+            <input class="hidden" type="radio" id="pixel-ratio-low" name="pixel-ratio" value="0.7">
+            <label class="flex-1 min-w-min rounded p-2" for="pixel-ratio-low">低</label>
+            <input class="hidden" type="radio" id="pixel-ratio-normal" name="pixel-ratio" value="1" checked>
+            <label class="flex-1 min-w-min rounded p-2" for="pixel-ratio-normal">普通</label>
+            <input class="hidden" type="radio" id="pixel-ratio-high" name="pixel-ratio" value="1">
+            <label class="hidden flex-1 min-w-min rounded p-2" for="pixel-ratio-high">高</label>
+          </div>
         </form>
       </div>
     </div>
@@ -85,7 +97,7 @@
     <div class="max-w-screen-sm mx-auto">
       <div class="mx-4 p-2 px-4 text-center">
         <button id="start-game" class="border border-white rounded p-4 w-full font-2xl bg-transparent text-white hover:bg-white hover:text-black">開始遊戲</button>
-        <p class="my-4">拖曳平移視角，可使用兩指或是滑鼠滾輪放大、縮小以及轉動視角</p>
+        <p class="my-4 text-xs">拖曳平移視角；透過滑鼠右鍵、滾輪或是多指手勢可對視角進行縮放、轉動</p>
         <p class="my-4"><a class="text-white" href="https://pastleo.me" target="_blank">作者部落格</a>｜<a class="text-white" href="https://github.com/pastleo/webgl-practice" target="_blank">Github</a></p>
       </div>
     </div>
