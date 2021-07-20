@@ -109,13 +109,26 @@ async function main() {
   canvas.addEventListener('touchend', enableUI);
   canvas.addEventListener('mouseup', enableUI);
 
+
+  let lastSecTime = 0, fps = 0, frames = 0;
   const renderLoop = time => {
     updateGame(game);
     render(game, time);
 
+    if (time - lastSecTime >= 1000) {
+      fps = frames * (time - lastSecTime) / 1000;
+      frames = 0;
+      lastSecTime = time;
+    }
+    frames++;
+
     requestAnimationFrame(renderLoop);
   }
   requestAnimationFrame(renderLoop);
+
+  setInterval(() => {
+    document.getElementById('fps').textContent = `(${canvas.width * game.pixelRatio}x${canvas.height * game.pixelRatio} | FPS: ${fps.toFixed(2)})`;
+  }, 1000);
 };
 
 main();

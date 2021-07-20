@@ -37,6 +37,7 @@
     .p-2 { padding: 0.5rem; }
     .p-4 { padding: 1rem; }
     .px-4 { padding-left: 1rem; padding-right: 1rem; }
+    .pl-2 { padding-left: 0.5rem; }
     .mx-4 { margin-left: 1rem; margin-right: 1rem; }
     .my-2 { margin-top: 0.5rem; margin-bottom: 0.5rem; }
     .text-center { text-align: center; }
@@ -81,7 +82,10 @@
             <label class="flex-1 min-w-min rounded p-2" for="turn-secs120">2 分鐘</label>
           </div>
           <div class="my-2 text-xs flex flex-wrap">
-            <p class="flex-1 my-2">解析度</p>
+            <p class="flex-1 my-2">
+              解析度<br>
+              <span id="fps" class="pl-2"></span>
+            </p>
             <input class="hidden" type="radio" id="pixel-ratio-low" name="pixel-ratio" value="0.7">
             <label class="flex-1 min-w-min rounded p-2" for="pixel-ratio-low">低</label>
             <input class="hidden" type="radio" id="pixel-ratio-normal" name="pixel-ratio" value="1" checked>
