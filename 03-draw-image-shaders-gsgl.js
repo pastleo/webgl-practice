@@ -166,8 +166,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   gl.generateMipmap(gl.TEXTURE_2D);
 
-  // In webgl 1, there seems no gl.generateMipmap:
-
   // transfer positions
   gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
   gl.bufferData(
